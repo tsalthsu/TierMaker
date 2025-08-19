@@ -1,4 +1,5 @@
-export const config = { runtime: 'edge' };
+// NOTE: Node 런타임으로 전환 (Edge에서 외부호출이 튀는 케이스 회피)
+export const config = { runtime: 'nodejs' };
 
 function ok(json) {
   return new Response(JSON.stringify(json), {
@@ -16,27 +17,72 @@ function bad(status, msg) {
   });
 }
 
+const UA =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36';
+
 async function fetchJSON(url) {
+  // 1) 원본 API 시도 (강한 UA/Accept)
   try {
-    const r = await fetch(url + (url.includes('?') ? '&' : '?') + 'origin=*');
+    const r = await fetch(
+      url + (url.includes('?') ? '&' : '?') + 'origin=*',
+      {
+        headers: {
+          'user-agent': UA,
+          accept: 'application/json,text/plain;q=0.9,*/*;q=0.8',
+          'accept-language': 'en-US,en;q=0.8,ko;q=0.7,zh;q=0.6',
+          referer: 'https://prts.wiki/',
+        },
+      }
+    );
     if (r.ok) return await r.json();
   } catch {}
+
+  // 2) Jina proxy (http) — 스킴 제거 형태
   try {
-    const r = await fetch('https://r.jina.ai/http/' + url.replace(/^https?:\/\//, ''));
+    const prox = 'https://r.jina.ai/http/' + url.replace(/^https?:\/\//, '');
+    const r = await fetch(prox, { headers: { 'user-agent': UA } });
     if (r.ok) return JSON.parse(await r.text());
   } catch {}
+
+  // 3) isomorphic-git CORS proxy
+  try {
+    const r = await fetch('https://cors.isomorphic-git.org/' + url, {
+      headers: { 'user-agent': UA },
+    });
+    if (r.ok) return await r.json();
+  } catch {}
+
   throw new Error('prts api unreachable');
 }
+
 async function fetchTEXT(url) {
+  // 1) 원본
   try {
-    const r = await fetch(url, { headers: { 'accept': 'text/html' } });
+    const r = await fetch(url, {
+      headers: {
+        'user-agent': UA,
+        accept: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.8',
+        'accept-language': 'en-US,en;q=0.8,ko;q=0.7,zh;q=0.6',
+        referer: 'https://prts.wiki/',
+      },
+    });
     if (r.ok) return await r.text();
   } catch {}
-  // text proxy
-  const prox = 'https://r.jina.ai/http/' + url.replace(/^https?:\/\//, '');
-  const r = await fetch(prox);
-  if (!r.ok) throw new Error('html fetch failed');
-  return await r.text();
+  // 2) Jina
+  try {
+    const prox = 'https://r.jina.ai/http/' + url.replace(/^https?:\/\//, '');
+    const r = await fetch(prox, { headers: { 'user-agent': UA } });
+    if (r.ok) return await r.text();
+  } catch {}
+  // 3) isomorphic-git
+  try {
+    const r = await fetch('https://cors.isomorphic-git.org/' + url, {
+      headers: { 'user-agent': UA },
+    });
+    if (r.ok) return await r.text();
+  } catch {}
+
+  throw new Error('html fetch failed');
 }
 
 const chunk = (arr, n) => (arr.length ? [arr.slice(0, n), ...chunk(arr.slice(n), n)] : []);
@@ -62,15 +108,13 @@ async function categorySixStar() {
   return arr.map((m) => ({ title: m.title, en: '' }));
 }
 
-/** 3) HTML 스크랩 폴백 (干员一览?rarity=1-6) */
+/** 3) HTML 스크랩 폴백 */
 async function scrapeListPage() {
   const url = 'https://prts.wiki/w/%E5%B9%B2%E5%91%98%E4%B8%80%E8%A7%88?rarity=1-6';
   const html = await fetchTEXT(url);
 
-  // 이미지와 타이틀(상위 a title)을 수집
-  // 头像_*.png 만 대상으로 수집 (원본/썸네일 모두 허용)
   const imgRegex = /<a[^>]*?\s+title="([^"]+)"[^>]*>\s*<img[^>]+?(?:src|data-src)="([^"]+头像_[^"]+\.png)"/gim;
-  const map = new Map(); // title -> image
+  const map = new Map();
   let m;
   while ((m = imgRegex.exec(html))) {
     const title = decodeHTMLEntities(m[1]).trim();
@@ -79,12 +123,9 @@ async function scrapeListPage() {
     map.set(title, src);
   }
 
-  // 타이틀 목록으로 영문명 보강 시도
   const titles = [...map.keys()];
   let enMap = {};
-  if (titles.length) {
-    enMap = await queryEnglishNames(titles);
-  }
+  if (titles.length) enMap = await queryEnglishNames(titles);
 
   return titles.map((t) => ({
     title: t,
@@ -103,7 +144,6 @@ function decodeHTMLEntities(s) {
 }
 
 async function queryEnglishNames(titles) {
-  // 시맨틱 ask는 타이틀별로도 가능하므로 50개 단위로 질의
   const out = {};
   for (const batch of chunk(titles, 50)) {
     const filters = batch.map((t) => `[[${t}]]`).join('');
@@ -123,7 +163,6 @@ async function queryEnglishNames(titles) {
 }
 
 async function withImages(entries) {
-  // pageimages 로 원본 이미지가 있으면 우선 사용
   const out = [];
   for (const batch of chunk(entries, 30)) {
     const titles = batch.map((e) => e.title).join('|');
@@ -133,38 +172,33 @@ async function withImages(entries) {
       )}`
     );
     const pages = qi?.query?.pages || {};
-    const map = {};
+    const imgMap = {};
     Object.values(pages).forEach((p) => {
-      if (p?.title) map[p.title] = p?.original?.source || '';
+      if (p?.title) imgMap[p.title] = p?.original?.source || '';
     });
     for (const e of batch) {
-      const img = map[e.title] || e.image || '';
+      const img = imgMap[e.title] || e.image || '';
       const label = e.en || e.title;
       out.push({ label, image: img });
     }
   }
-  // 이미지 없는 건 버림
   return out.filter((x) => x.image);
 }
 
 export default async function handler(req) {
   try {
-    // 1) ASK
     let entries = await askSixStar();
-    // 2) 카테고리
     if (!entries.length) entries = await categorySixStar();
-    // 3) HTML 스크랩
+
     let scraped = [];
     if (!entries.length) scraped = await scrapeListPage();
 
     if (!entries.length && !scraped.length) return ok([]);
 
-    // entries가 비면 scraped로 대체
     if (!entries.length) {
       const list = scraped.map((s) => ({ title: s.title, en: s.en, image: s.image }));
       return ok(await withImages(list));
     } else {
-      // entries가 있으면 이미지/영문명 보강
       const list = entries.map((e) => ({ title: e.title, en: e.en, image: '' }));
       return ok(await withImages(list));
     }
