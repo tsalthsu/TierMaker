@@ -242,7 +242,7 @@ async function loadSixFromOps() {
           <div className="flex items-center gap-2 md:gap-3">
             <BlobButton onClick={addTier}>티어 추가</BlobButton>
             <BlobButton onClick={()=> { setPool(items.map(i=>i.id)); setTiers(prev=> prev.map(t=>({...t,items:[]}))); }}>초기화</BlobButton>
-            <BlobButton onClick={importPRTS6}>PRTS 6★ 불러오기</BlobButton>
+            <BlobButton onClick={loadSixFromOps}>6성 불러오기</BlobButton>
           </div>
         </div>
       </header>
