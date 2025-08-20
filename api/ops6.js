@@ -6,7 +6,7 @@ export default async function handler(req, res) {
   const EN_URL =
     "https://raw.githubusercontent.com/Kengxxiao/ArknightsGameData/master/en_US/gamedata/excel/character_table.json";
   const ZH_URL =
-    "https://raw.githubusercontent.com/Kengxxiao/ArknightsGameData/master/zh_CN/gamedata/excel/character_table.json";
+    "https://raw.githubusercontent.com/Kengxxiao/ArknightsGameData/blob/master/zh_CN/gamedata/excel/character_table.json";
 
   const esc = encodeURIComponent;
   async function fetchJSON(url) {
