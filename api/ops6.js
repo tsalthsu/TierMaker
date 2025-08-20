@@ -1,28 +1,62 @@
-// pages/api/ops6.js
-export default async function handler(req, res) {
+// api/ops6.js
+export const config = { runtime: "nodejs" };
+
+const UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36";
+
+const OPS_URL =
+  "https://raw.githubusercontent.com/Aceship/AN-EN-Tags/master/json/operators.json";
+const AVATAR_BASE =
+  "https://raw.githubusercontent.com/Aceship/Arknight-Images/main/avatars/";
+
+function ok(json) {
+  return new Response(JSON.stringify(json), {
+    status: 200,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "public, max-age=3600, s-maxage=3600",
+    },
+  });
+}
+function bad(status, msg) {
+  return new Response(JSON.stringify({ error: msg }), {
+    status,
+    headers: { "content-type": "application/json; charset=utf-8" },
+  });
+}
+async function fetchJSON(url) {
+  const r = await fetch(url, {
+    headers: { "user-agent": UA, accept: "application/json" },
+  });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
+async function urlExists(url) {
   try {
-    // PRTS 위키의 6성 오퍼레이터 목록 불러오기
-    const response = await fetch("https://prts.wiki/api.php?action=query&list=categorymembers&cmtitle=Category:六星干员&cmlimit=500&format=json");
-    const data = await response.json();
+    const r = await fetch(url, { method: "HEAD", headers: { "user-agent": UA } });
+    return r.ok;
+  } catch { return false; }
+}
 
-    // 각 오퍼레이터의 파일명(아이콘) 얻기
-    const members = data?.query?.categorymembers || [];
+export default async function handler() {
+  try {
+    const data = await fetchJSON(OPS_URL);
+    // rarity: 0~5 (5 == 6★)
+    const six = Object.values(data)
+      .filter((op) => op && typeof op === "object" && op.rarity === 5)
+      .map((op) => ({ id: op.id, label: op.name || op.en })); // ex) id: char_103_angel
 
-    // File:头像_캐릭터명.png -> 실제 media.prts.wiki URL 로 매핑
-    const ops = members.map(m => {
-      const name = m.title.replace("干员/", ""); // "干员/凯尔希" → "凯尔希"
-      const filename = `头像_${name}.png`;
-      const url = `https://media.prts.wiki/commons/${encodeURIComponent(filename[0])}/${encodeURIComponent(filename[1])}/${encodeURIComponent(filename)}`;
+    const results = [];
+    await Promise.all(
+      six.map(async (op) => {
+        const img = `${AVATAR_BASE}${op.id}.png`;
+        if (await urlExists(img)) results.push({ label: op.label, image: img });
+      })
+    );
 
-      return {
-        name,
-        icon: url
-      };
-    });
-
-    res.status(200).json({ operators: ops });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "PRTS 데이터 불러오기 실패" });
+    results.sort((a, b) => a.label.localeCompare(b.label));
+    return ok(results);
+  } catch (e) {
+    return bad(500, e.message || "github fetch failed");
   }
 }
