@@ -114,7 +114,19 @@ export default function TierListApp() {
     if(to==='pool'){ setPool(prev=> insertAt(prev.filter(x=>x!==id), prev.length, id)); }
     else { setTiers(prev=>{ const copy=prev.map(t=>({...t,items:[...t.items]})); const arr=copy[to.tierIndex].items.filter(x=>x!==id); const insertIndex=clamp(to.index ?? arr.length,0,arr.length); arr.splice(insertIndex,0,id); copy[to.tierIndex].items=arr; return copy; }); }
   }
-
+// App.jsx (TierListApp 내부 어딘가 함수들 사이에 추가)
+async function loadSixFromOps() {
+  try {
+    const r = await fetch('/api/ops6');
+    if (!r.ok) throw new Error('불러오기 실패');
+    const list = await r.json(); // [{label, image}]
+    // 이미 있는 추가 유틸 재사용
+    list.forEach(({ label, image }) => addNewItem(label, image));
+  } catch (e) {
+    console.error(e);
+    alert('불러오기에 실패했습니다. (/api/ops6 확인)');
+  }
+}
   function onDropToTier(e, tierIndex){
     e.preventDefault();
     try {
