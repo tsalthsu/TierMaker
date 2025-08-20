@@ -1,22 +1,23 @@
-// api/prts6.js
-// ─────────────────────────────────────────────────────────────
-// Vercel 서버리스(Node)에서 PRTS 6★ 목록(영문명 + 头像_*.png) 가져오기
-// - 외부 호출 타임아웃(7s) + 병렬 폴백(Promise.any): origin, Jina, cors
-// - 1) Semantic ASK → 2) Category → 3) HTML 스크랩 순서
-// - pageimages 로 원본 이미지 보강, label은 영문명 우선
-// ─────────────────────────────────────────────────────────────
+// /api/ops6.js
+// Arknights 6성 오퍼레이터 아이콘 불러오기 (PRTS + GameData)
 
 export const config = { runtime: "nodejs" };
 
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36";
 
+// GameData (Kengxxiao GitHub 미러)
+const EN_URL =
+  "https://raw.githubusercontent.com/Kengxxiao/ArknightsGameData/master/en_US/gamedata/excel/character_table.json";
+const ZH_URL =
+  "https://raw.githubusercontent.com/Kengxxiao/ArknightsGameData/master/zh_CN/gamedata/excel/character_table.json";
+
 function ok(json) {
   return new Response(JSON.stringify(json), {
     status: 200,
     headers: {
       "content-type": "application/json; charset=utf-8",
-      "cache-control": "max-age=60, s-maxage=180",
+      "cache-control": "public, max-age=3600, s-maxage=3600", // 1시간 캐시
     },
   });
 }
@@ -28,205 +29,49 @@ function bad(status, msg) {
   });
 }
 
-function decodeHTMLEntities(s) {
-  return s
-    .replace(/&amp;/g, "&")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">");
+async function fetchJSON(url) {
+  const r = await fetch(url, { headers: { "user-agent": UA, accept: "application/json" } });
+  if (!r.ok) throw new Error(`HTTP ${r.status} on ${url}`);
+  return r.json();
 }
 
-const chunk = (arr, n) =>
-  arr.length ? [arr.slice(0, n), ...chunk(arr.slice(n), n)] : [];
+const esc = encodeURIComponent;
 
-// ── fetch 유틸: 타임아웃 + 병렬 폴백 ──────────────────────────────
-async function fetchWithTimeout(url, opts = {}, timeoutMs = 7000) {
-  const ctrl = new AbortController();
-  const id = setTimeout(() => ctrl.abort(), timeoutMs);
+export default async function handler() {
   try {
-    const res = await fetch(url, { ...opts, signal: ctrl.signal });
-    clearTimeout(id);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return res;
-  } catch (e) {
-    clearTimeout(id);
-    throw e;
-  }
-}
+    // GameData 불러오기 (영문 + 중문)
+    const [en, zh] = await Promise.all([fetchJSON(EN_URL), fetchJSON(ZH_URL)]);
 
-async function fetchJSONany(url) {
-  const targets = [
-    // origin
-    url + (url.includes("?") ? "&" : "?") + "origin=*",
-    // Jina proxy
-    "https://r.jina.ai/http/" + url.replace(/^https?:\/\//, ""),
-    // isomorphic-git CORS proxy
-    "https://cors.isomorphic-git.org/" + url,
-  ];
-  const headers = {
-    "user-agent": UA,
-    accept: "application/json,text/plain;q=0.9,*/*;q=0.8",
-    "accept-language": "en-US,en;q=0.8,ko;q=0.7,zh;q=0.6",
-    referer: "https://prts.wiki/",
-  };
-  const racers = targets.map((u) =>
-    fetchWithTimeout(u, { headers }, 7000).then((r) => r.json())
-  );
-  return Promise.any(racers);
-}
-
-async function fetchTEXTany(url) {
-  const targets = [
-    url,
-    "https://r.jina.ai/http/" + url.replace(/^https?:\/\//, ""),
-    "https://cors.isomorphic-git.org/" + url,
-  ];
-  const headers = {
-    "user-agent": UA,
-    accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
-    "accept-language": "en-US,en;q=0.8,ko;q=0.7,zh;q=0.6",
-    referer: "https://prts.wiki/",
-  };
-  const racers = targets.map((u) =>
-    fetchWithTimeout(u, { headers }, 7000).then((r) => r.text())
-  );
-  return Promise.any(racers);
-}
-
-// ── 1) Semantic ASK (영문명 포함) ────────────────────────────────
-async function askSixStar() {
-  const query = encodeURIComponent(
-    "[[分类:干员]][[稀有度::6||★6]]|?干员外文名|limit=500"
-  );
-  const url = `https://prts.wiki/api.php?action=ask&api_version=3&format=json&query=${query}`;
-  const data = await fetchJSONany(url);
-  const results = Array.isArray(data?.results) ? data.results : [];
-  return results.map((r) => ({
-    title: r.fulltext,
-    en: (r.printouts?.["干员外文名"]?.[0] || "").toString().trim(),
-  }));
-}
-
-// ── 2) Category 폴백 ────────────────────────────────────────────
-async function categorySixStar() {
-  const cmtitle = encodeURIComponent("Category:六星干员");
-  const url = `https://prts.wiki/api.php?action=query&list=categorymembers&cmtitle=${cmtitle}&cmlimit=500&format=json`;
-  const data = await fetchJSONany(url);
-  const arr = Array.isArray(data?.query?.categorymembers)
-    ? data.query.categorymembers
-    : [];
-  return arr.map((m) => ({ title: m.title, en: "" }));
-}
-
-// ── 3) HTML 스크랩 폴백 (干员一览?rarity=1-6) ─────────────────────
-async function scrapeListPage() {
-  const url =
-    "https://prts.wiki/w/%E5%B9%B2%E5%91%98%E4%B8%80%E8%A7%88?rarity=1-6";
-  const html = await fetchTEXTany(url);
-
-  // <a title="이름"><img ... src|data-src="...头像_...png">
-  const imgRegex =
-    /<a[^>]*?\s+title="([^"]+)"[^>]*>\s*<img[^>]+?(?:src|data-src)="([^"]+头像_[^"]+\.png)"/gim;
-
-  const map = new Map(); // title -> image
-  let m;
-  while ((m = imgRegex.exec(html))) {
-    const title = decodeHTMLEntities(m[1]).trim();
-    let src = m[2];
-    if (src.startsWith("//")) src = "https:" + src;
-    map.set(title, src);
-  }
-
-  const titles = [...map.keys()];
-  let enMap = {};
-  if (titles.length) enMap = await queryEnglishNames(titles);
-
-  return titles.map((t) => ({
-    title: t,
-    en: (enMap[t] || "").trim(),
-    image: map.get(t),
-  }));
-}
-
-// ── 타이틀별 영문명 조회(50개씩 ASK) ─────────────────────────────
-async function queryEnglishNames(titles) {
-  const out = {};
-  for (const batch of chunk(titles, 50)) {
-    const filters = batch.map((t) => `[[${t}]]`).join("");
-    const query = encodeURIComponent(`${filters}|?干员外文名|limit=500`);
-    const url = `https://prts.wiki/api.php?action=ask&api_version=3&format=json&query=${query}`;
-    try {
-      const data = await fetchJSONany(url);
-      const results = Array.isArray(data?.results) ? data.results : [];
-      results.forEach((r) => {
-        const title = r.fulltext;
-        const en = (r.printouts?.["干员外文名"]?.[0] || "").toString();
-        if (title) out[title] = en;
-      });
-    } catch {
-      // 무시하고 다음 배치
-    }
-  }
-  return out;
-}
-
-// ── 이미지 보강(pageimages) + 최종 정리 ──────────────────────────
-async function withImages(entries) {
-  const out = [];
-  for (const batch of chunk(entries, 30)) {
-    const titles = batch.map((e) => e.title).join("|");
-    const url = `https://prts.wiki/api.php?action=query&prop=pageimages&piprop=original&format=json&titles=${encodeURIComponent(
-      titles
-    )}`;
-    const qi = await fetchJSONany(url);
-    const pages = qi?.query?.pages || {};
-    const imgMap = {};
-    Object.values(pages).forEach((p) => {
-      if (p?.title) imgMap[p.title] = p?.original?.source || "";
+    // id → 중국어 이름 맵
+    const zhName = {};
+    Object.values(zh).forEach((c) => {
+      if (c && typeof c === "object" && c.id && c.name) {
+        zhName[c.id] = String(c.name);
+      }
     });
-    for (const e of batch) {
-      const img = imgMap[e.title] || e.image || "";
-      const label = e.en || e.title;
-      if (img) out.push({ label, image: img });
-    }
-  }
-  return out;
-}
 
-// ── 핸들러 ───────────────────────────────────────────────────────
-export default async function handler(req) {
-  try {
-    // 1) ASK
-    let entries = await askSixStar();
+    // 6성만 추출 (rarity: 0~5 → 5가 6성)
+    const out = [];
+    Object.values(en).forEach((c) => {
+      if (!c || typeof c !== "object") return;
+      if (c.rarity !== 5) return;
 
-    // 2) 카테고리
-    if (!entries.length) entries = await categorySixStar();
+      const id = c.id;
+      const label = String(c.name || c.appellation || id);
+      const zname = zhName[id];
+      if (!zname) return;
 
-    // 3) HTML 스크랩
-    let scraped = [];
-    if (!entries.length) scraped = await scrapeListPage();
+      // Special:FilePath로 아이콘 URL 생성
+      const image = `https://prts.wiki/w/Special:FilePath/${esc("头像_" + zname + ".png")}`;
 
-    if (!entries.length && !scraped.length) return ok([]);
+      out.push({ label, image });
+    });
 
-    if (!entries.length) {
-      // scraped만 있을 때
-      const list = scraped.map((s) => ({
-        title: s.title,
-        en: s.en,
-        image: s.image,
-      }));
-      return ok(await withImages(list));
-    } else {
-      // entries가 있으면 이미지 보강
-      const list = entries.map((e) => ({
-        title: e.title,
-        en: e.en,
-        image: "",
-      }));
-      return ok(await withImages(list));
-    }
-  } catch (err) {
-    return bad(504, err.message || "proxy timeout");
+    // 이름순 정렬
+    out.sort((a, b) => a.label.localeCompare(b.label));
+
+    return ok(out);
+  } catch (e) {
+    return bad(500, e.message || "fetch failed");
   }
 }
