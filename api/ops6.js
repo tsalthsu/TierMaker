@@ -1,62 +1,52 @@
 // api/ops6.js
-export const config = { runtime: "nodejs" };
+// Source: Kengxxiao GameData (up-to-date) + PRTS Special:FilePath
 
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36";
 
-const OPS_URL =
-  "https://raw.githubusercontent.com/Aceship/AN-EN-Tags/master/json/operators.json";
-const AVATAR_BASE =
-  "https://raw.githubusercontent.com/Aceship/Arknight-Images/main/avatars/";
+const EN_URL =
+  "https://raw.githubusercontent.com/Kengxxiao/ArknightsGameData/master/en_US/gamedata/excel/character_table.json";
+const ZH_URL =
+  "https://raw.githubusercontent.com/Kengxxiao/ArknightsGameData/master/zh_CN/gamedata/excel/character_table.json";
 
-function ok(json) {
-  return new Response(JSON.stringify(json), {
-    status: 200,
-    headers: {
-      "content-type": "application/json; charset=utf-8",
-      "cache-control": "public, max-age=3600, s-maxage=3600",
-    },
-  });
-}
-function bad(status, msg) {
-  return new Response(JSON.stringify({ error: msg }), {
-    status,
-    headers: { "content-type": "application/json; charset=utf-8" },
-  });
-}
 async function fetchJSON(url) {
-  const r = await fetch(url, {
-    headers: { "user-agent": UA, accept: "application/json" },
-  });
-  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  const r = await fetch(url, { headers: { "user-agent": UA, accept: "application/json" } });
+  if (!r.ok) throw new Error(`HTTP ${r.status} on ${url}`);
   return r.json();
 }
-async function urlExists(url) {
+const esc = encodeURIComponent;
+
+export default async function handler(req, res) {
   try {
-    const r = await fetch(url, { method: "HEAD", headers: { "user-agent": UA } });
-    return r.ok;
-  } catch { return false; }
-}
+    const [en, zh] = await Promise.all([fetchJSON(EN_URL), fetchJSON(ZH_URL)]);
 
-export default async function handler() {
-  try {
-    const data = await fetchJSON(OPS_URL);
-    // rarity: 0~5 (5 == 6★)
-    const six = Object.values(data)
-      .filter((op) => op && typeof op === "object" && op.rarity === 5)
-      .map((op) => ({ id: op.id, label: op.name || op.en })); // ex) id: char_103_angel
+    // id -> 중국어 이름
+    const zhName = {};
+    Object.values(zh).forEach((c) => {
+      if (c && typeof c === "object" && c.id && c.name) {
+        zhName[c.id] = String(c.name);
+      }
+    });
 
-    const results = [];
-    await Promise.all(
-      six.map(async (op) => {
-        const img = `${AVATAR_BASE}${op.id}.png`;
-        if (await urlExists(img)) results.push({ label: op.label, image: img });
-      })
-    );
+    // rarity: 0~5 (5 == 6성)
+    const out = [];
+    Object.values(en).forEach((c) => {
+      if (!c || typeof c !== "object") return;
+      if (c.rarity !== 5) return;
+      const id = c.id;
+      const label = String(c.name || c.appellation || id);
+      const zname = zhName[id];
+      if (!zname) return;
 
-    results.sort((a, b) => a.label.localeCompare(b.label));
-    return ok(results);
+      // Special:FilePath → 해시폴더 몰라도 원본으로 리다이렉트
+      const image = `https://prts.wiki/w/Special:FilePath/${esc("头像_" + zname + ".png")}`;
+      out.push({ label, image });
+    });
+
+    out.sort((a, b) => a.label.localeCompare(b.label));
+    res.setHeader("cache-control", "public, max-age=3600, s-maxage=3600");
+    res.status(200).json(out);
   } catch (e) {
-    return bad(500, e.message || "github fetch failed");
+    res.status(500).json({ error: e.message || "fetch failed" });
   }
 }
