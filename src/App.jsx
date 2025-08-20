@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-
+/* @vite-ignore */
 // Arknights Tier – Clean (rev: Stable InsertIndex v2)
 // - Fix: same-tier left→right wouldn't cross (removed extra decrement when excluding dragged)
 // - Fix: tier hover flicker on thin gaps/edges (leave guard using expanded bounds)
@@ -497,3 +497,4 @@ function uid(){ return Math.random().toString(36).slice(2,9)+Date.now().toString
 function clamp(n,a,b){ return Math.max(a, Math.min(b,n)); }
 function insertAt(arr,index,value){ const c=arr.slice(); c.splice(index,0,value); return c; }
 function randomNiceColor(){ const palette=["#60a5fa","#38bdf8","#22d3ee","#34d399","#a78bfa","#f472b6","#fbbf24","#f97316","#ef4444"]; return palette[Math.floor(Math.random()*palette.length)]; }
+export { TierListApp as App };
