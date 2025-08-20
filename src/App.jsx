@@ -181,52 +181,75 @@ export default function TierListApp() {
   function onSelectFiles(e){ const files=[...(e.target.files||[])]; if(files.length) addFilesAsItems(files); e.target.value=''; }
   function addFilesAsItems(files){ const readers=files.map(file=> new Promise(res=>{ const r=new FileReader(); r.onload=()=> res({name:file.name.replace(/\.[^.]+$/, ''), dataUrl:r.result}); r.readAsDataURL(file); })); Promise.all(readers).then(list=>{ const created=list.map(({name,dataUrl})=> ({id:uid(), label:name, image:dataUrl})); setItems(prev=>[...prev,...created]); setPool(prev=>[...prev,...created.map(c=>c.id)]); }); }
   function addNewItem(label,image){ const id=uid(); const item={id, label:label||'새 아이템', image:image||newImgUrl||''}; setItems(p=>[...p,item]); setPool(p=>[...p,id]); setNewLabel(''); setNewImgUrl(''); }
-// App.jsx (TierListApp 내부 어딘가 함수들 사이에 추가)
+// App.jsx 안, loadSixFromOps 교체
 async function loadSixFromOps() {
   try {
-    const r = await fetch('/api/ops6');
+    const r = await fetch('/api/ops6', { headers: { 'Accept': 'application/json' } });
     if (!r.ok) throw new Error('불러오기 실패');
-    const list = await r.json(); // [{label, image}]
-    // 이미 있는 추가 유틸 재사용
-    list.forEach(({ label, image }) => addNewItem(label, image));
+    const raw = await r.json();
+
+    // 1) 배열이 아니면 data/result 속에서 찾아봄
+    const arr = Array.isArray(raw)
+      ? raw
+      : Array.isArray(raw?.data)
+      ? raw.data
+      : Array.isArray(raw?.result)
+      ? raw.result
+      : [];
+
+    if (!arr.length) {
+      alert('가져올 항목이 없습니다. (/api/ops6 응답 확인)');
+      return;
+    }
+
+    // 2) 다양한 키 이름을 허용해서 통일
+    const normalized = arr
+      .map((x) => {
+        // 객체가 아니면 문자열로 간주
+        if (x == null) return null;
+        if (typeof x === 'string') return { label: x, image: '' };
+
+        const label =
+          x.label || x.name || x.appellation || x.en || x.kr || x.jp || '';
+        const image =
+          x.image || x.icon || x.img || x.url || x.src || '';
+
+        if (!label) return null;
+        return { label: String(label), image: String(image || '') };
+      })
+      .filter(Boolean);
+
+    // 3) 라벨 중복 제거 + 기존 아이템과도 중복 제거
+    const existing = new Set(items.map((it) => it.label));
+    const dedup = [];
+    const seen = new Set();
+    for (const it of normalized) {
+      if (existing.has(it.label)) continue;
+      if (seen.has(it.label)) continue;
+      seen.add(it.label);
+      dedup.push(it);
+    }
+
+    if (!dedup.length) {
+      alert('새로 추가할 항목이 없습니다.');
+      return;
+    }
+
+    // 4) 한 번에 추가
+    const created = dedup.map(({ label, image }) => ({
+      id: uid(),
+      label,
+      image,
+    }));
+    setItems((p) => [...p, ...created]);
+    setPool((p) => [...p, ...created.map((c) => c.id)]);
+
+    alert(`6★ ${created.length}개 추가됨`);
   } catch (e) {
     console.error(e);
     alert('불러오기에 실패했습니다. (/api/ops6 확인)');
   }
 }
-  const [openTierMenu,setOpenTierMenu]=useState(null);
-  const [hoverTierIndex, setHoverTierIndex] = useState(null);
-  const [hoverInsertIndex, setHoverInsertIndex] = useState(null);
-  useEffect(()=>{ const onDoc=()=> setOpenTierMenu(null); const onKey=e=>{ if(e.key==='Escape') setOpenTierMenu(null); }; document.addEventListener('click',onDoc); document.addEventListener('keydown',onKey); return ()=>{ document.removeEventListener('click',onDoc); document.removeEventListener('keydown',onKey); }; },[]);
-
-  // -------- PRTS Import via proxy endpoint --------
-  const PROXY_ENDPOINT = '/api/prts6'; // deploy the function at this path on your domain
-  async function importPRTS6(){
-    try{
-      const res = await fetch(`${PROXY_ENDPOINT}?rarity=6`, { headers:{'Accept':'application/json'} });
-      if(!res.ok) throw new Error(`proxy ${res.status}`);
-      const list = await res.json();
-      if(!Array.isArray(list) || !list.length) throw new Error('결과 없음');
-      const newItems = [];
-      for(const e of list){
-        const label = (e.label||'').toString();
-        const image = (e.image||'').toString();
-        if(!label) continue;
-        if(!items.some(it=> it.label===label)) newItems.push({ id: uid(), label, image });
-      }
-      if(newItems.length){
-        setItems(prev=> [...prev, ...newItems]);
-        setPool(prev=> [...prev, ...newItems.map(n=> n.id)]);
-        alert(`PRTS 6★ 불러오기 완료: ${newItems.length}개 추가됨`);
-      } else {
-        alert('새로 추가할 항목이 없습니다.');
-      }
-    }catch(err){
-      console.warn(err);
-      alert('불러오기에 실패했습니다. 서버 엔드포인트 설정을 확인하세요.');
-    }
-  }
-
   return (
     <div className={`${isDark?'text-white':'text-slate-900'} min-h-screen transition-colors duration-300 ${isDark?'bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800':'bg-gradient-to-br from-slate-100 via-white to-slate-100'}`}>
       <GooDefs/>
