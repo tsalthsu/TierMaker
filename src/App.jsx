@@ -41,12 +41,12 @@ export default function TierListApp() {
   const pendingPosRef = useRef(null);
   const lastPosRef = useRef(null); // track latest committed x,y
 
-  // ✅ ADDED: tier 메뉴/호버 상태들
+  // Tier 메뉴/호버 상태
   const [openTierMenu, setOpenTierMenu] = useState(null);
   const [hoverTierIndex, setHoverTierIndex] = useState(null);
   const [hoverInsertIndex, setHoverInsertIndex] = useState(null);
 
-  // global end handler to avoid lingering semi-transparent cards on invalid drops
+  // global end handler
   const endRef = useRef(()=>{});
   useEffect(()=>{ endRef.current = onDragEnd; });
   useEffect(()=>{ const handler=()=> endRef.current();
@@ -59,7 +59,7 @@ export default function TierListApp() {
     return ()=>{ window.removeEventListener('dragend', handler); window.removeEventListener('drop', handler); window.removeEventListener('dragcancel', handler); window.removeEventListener('pointerup', handler); window.removeEventListener('blur', handler); document.removeEventListener('mouseleave', handler); };
   },[]);
 
-  // ✅ ADDED: 바깥 클릭/ESC로 tier 메뉴 닫기
+  // 바깥 클릭/ESC로 tier 메뉴 닫기
   useEffect(() => {
     const onDoc = () => setOpenTierMenu(null);
     const onKey = (e) => { if (e.key === 'Escape') setOpenTierMenu(null); };
@@ -71,13 +71,11 @@ export default function TierListApp() {
     };
   }, []);
 
-  // global dragover to keep cursor position even outside drop zones
+  // global dragover to keep cursor even outside zones
   useEffect(()=>{
     function onGlobalDragOver(e){
-      // keep last pointer position fresh
       lastPosRef.current = { x: e.clientX, y: e.clientY };
-      // detect which tier (if any) contains the point; make highlight sticky if inside
-      const m = 14; // expanded margin
+      const m = 14;
       let foundIdx = null;
       for(const [k,el] of Object.entries(tierContainerRefs.current||{})){
         if(!el) continue; const r = el.getBoundingClientRect();
@@ -97,7 +95,7 @@ export default function TierListApp() {
 
   const itemById = useMemo(()=> Object.fromEntries(items.map(i=>[i.id,i])), [items]);
 
-  // smoke tests (include simple extra checks)
+  // smoke tests
   useEffect(() => {
     try {
       console.assert(Array.isArray(tiers) && tiers.length >= 1, 'tiers initialized');
@@ -139,7 +137,6 @@ export default function TierListApp() {
     try {
       const data=JSON.parse(e.dataTransfer.getData('text/plain'));
       const container=tierContainerRefs.current[tierIndex];
-      // compute index with exclusion for same-tier (so no extra decrement needed)
       let insertIndex=computeInsertIndex(container,e.clientX,e.clientY,(data.from && data.from.tierIndex===tierIndex)? data.id : null);
       moveItem({ id:data.id, from:data.from, to:{ tierIndex, index:insertIndex } });
       if(tierIndex===0){ setJustPoppedId(data.id); triggerSparkles(e.clientX,e.clientY); setTimeout(()=> setJustPoppedId(null),450);} 
@@ -148,36 +145,58 @@ export default function TierListApp() {
   }
   function onDropToPool(e){ e.preventDefault(); try{ const data=JSON.parse(e.dataTransfer.getData('text/plain')); moveItem({ id:data.id, from:data.from, to:'pool' }); }catch{} onDragEnd(); }
 
+  // === PATCHED: 카드 높이 포함 rect 수집 ===
   function getCardRects(container){
-    if(!container) return [];
-    const cards=[...container.querySelectorAll('[data-role="card"]')];
-    return cards.map(el=>{
-      const r=el.getBoundingClientRect();
+    if (!container) return [];
+    const cards = [...container.querySelectorAll('[data-role="card"]')];
+    return cards.map(el => {
+      const r = el.getBoundingClientRect();
       const id = el.dataset.id;
-      return {id, cx:r.left+r.width/2, cy:r.top+r.height/2, left:r.left, right:r.right, top:r.top, bottom:r.bottom, w:r.width};
+      return {
+        id,
+        cx: r.left + r.width / 2,
+        cy: r.top + r.height / 2,
+        left: r.left,
+        right: r.right,
+        top: r.top,
+        bottom: r.bottom,
+        w: r.width,
+        h: r.height,
+      };
     });
   }
+
+  // === PATCHED: 세로 밴드 동적 계산(행 이동 안정화) ===
   function computeInsertIndex(container, x, y, excludeId){
-    if(!container) return 0;
+    if (!container) return 0;
     const tierIndex = Number(container?.dataset?.tierIndex ?? -1);
     let rects = cachedRectsRef.current[tierIndex];
-    if(!rects){ rects = getCardRects(container); cachedRectsRef.current[tierIndex]=rects; }
-    if(!rects.length) return 0;
-    // exclude current dragged in same-tier to avoid self-interference
-    let list = excludeId ? rects.filter(r=> r.id !== excludeId) : rects.slice();
-    if(!list.length) return 0;
-    // row band: stabilize across multi-line wraps
-    const band = 60; // px vertical band
-    const rowList = list.filter(r=> Math.abs(r.cy - y) <= band);
-    if(rowList.length) list = rowList;
-    // midpoint: move only after crossing neighbor center
+    if (!rects) {
+      rects = getCardRects(container);
+      cachedRectsRef.current[tierIndex] = rects;
+    }
+    if (!rects.length) return 0;
+
+    // 같은 티어에서 끄는 카드 제외
+    let list = excludeId ? rects.filter(r => r.id !== excludeId) : rects.slice();
+    if (!list.length) return 0;
+
+    // 카드 높이에 비례한 세로 밴드 (작아도 안정적인 행 판정)
+    const avgH = list.reduce((s, r) => s + (r.h || 0), 0) / list.length || 100;
+    const band = Math.max(avgH * 0.8, 90);
+
+    const rowList = list.filter(r => Math.abs(r.cy - y) <= band);
+    if (rowList.length) list = rowList;
+
+    // 가운데선 기준으로 좌우 위치 결정
     let index = list.length;
-    for(let i=0;i<list.length;i++){
+    for (let i = 0; i < list.length; i++) {
       const r = list[i];
-      if(x < r.cx){ index = i; break; }
+      if (x < r.cx) { index = i; break; }
     }
     return clamp(index, 0, list.length);
   }
+
   // helper: is pointer inside tier (with margin)
   const isPointInsideTier = (tierIdx, margin=12) => {
     const p = lastPosRef.current; const el = tierContainerRefs.current[tierIdx];
@@ -449,7 +468,7 @@ function DraggableItem({ item, onDragStart, justPopped, index, isDark, onRename,
           : <div className={`${isDark?'bg-slate-700/70 text-white/70':'bg-slate-100 text-slate-400'} w-full h-full flex items-center justify-center text-xs`}>IMG</div>}
         </div>
       <div className={`item-name ${isDark? 'bg-slate-900/35 text-white':'bg-white/85 text-slate-900'}`}>
-        <FitText text={item.label} maxFont={14} minFont={7}  maxLines={1} />
+        <FitText text={item.label} maxFont={14} minFont={7} maxLines={1} />
       </div>
     </div>
   );
@@ -461,7 +480,7 @@ function GhostPreview({item,isDark}){
     <div className={`item-card ghost-card border-2 ${isDark?'bg-slate-800/50 border-white/20':'bg-white/60 border-slate-300/60'}`} data-role="card-ghost">
       <div className="item-img" style={{opacity:.6}}>{item.image? <img src={item.image} alt="ghost" className="img-el"/> : <div className={`${isDark?'bg-slate-700/60 text-white/50':'bg-slate-100 text-slate-400'} w-full h-full flex items-center justify-center text-xs`}>IMG</div>}</div>
       <div className={`item-name ${isDark? 'bg-slate-900/25 text-white/80':'bg-white/70 text-slate-800'}`} style={{opacity:.9}}>
-        <FitText text={item.label} maxFont={14} minFont={7}  maxLines={1} />
+        <FitText text={item.label} maxFont={14} minFont={7} maxLines={1} />
       </div>
     </div>
   );
