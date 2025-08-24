@@ -401,10 +401,10 @@ export default function TierListApp() {
       </main>
 
       <style>{`
-        .item-card { position: relative; width: 78px; height: 115px; border-radius: 14px; display: flex; flex-direction: column; overflow: visible; }
-        .item-img { width: 100%; height: 74px; overflow: hidden; border-top-left-radius: 14px; border-top-right-radius: 14px; }
+        .item-card { position: relative; width: 78px; height: 115px; border-radius: 12px; display: flex; flex-direction: column; overflow: visible; }
+        .item-img { width: 100%; height: 78px; overflow: hidden; border-top-left-radius: 12px; border-top-right-radius: 12px; }
         .item-card .img-el { width: 100%; height: 100%; object-fit: cover; }
-        .item-name { height: 36px; display: grid; place-items: center; padding: 3px 4px; font-weight: 800; text-align: center; line-height: 1.05; border-bottom-left-radius: 14px; border-bottom-right-radius: 14px; backdrop-filter: saturate(120%) blur(2px); overflow: hidden; }
+        .item-name { height: 32px; display: grid; place-items: center; padding: 2px 4px; font-weight: 800; text-align: center; line-height: 1.05; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; backdrop-filter: saturate(120%) blur(2px); overflow: hidden; }
         .item-card:after { content: ""; position: absolute; inset: -1px; border-radius: 18px; pointer-events: none; opacity: 0; transition: opacity .2s ease; background: radial-gradient(120px 80px at var(--mx,50%) var(--my,50%), rgba(255,255,255,.15), transparent 50%); }
         .item-card:hover:after { opacity: 1; }
         .animate-pop { animation: pop .4s cubic-bezier(.2,1,.4,1); }
