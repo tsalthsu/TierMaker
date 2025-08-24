@@ -269,7 +269,7 @@ export default function TierListApp() {
       <ThemeToggle isDark={isDark} onToggle={()=> setTheme(isDark?'light':'dark')} />
 
       <header className={`sticky top-0 z-30 backdrop-blur border-b ${isDark?'bg-slate-900/50 border-white/10':'bg-white/70 border-slate-200/70'}`}>
-        <div className="mx-auto max-w-6xl px-4 py-4 flex items-center justify-between">
+        <div className="mx-auto max-w-[1400px] px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-2xl shadow-lg relative overflow-hidden" style={{filter:'url(#goo)', background:isDark?'#3b82f6':'#60a5fa'}}><BubbleDots/></div>
             <h1 className="text-xl font-semibold tracking-tight">Arknights Tier – Clean</h1>
@@ -282,7 +282,7 @@ export default function TierListApp() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-6">
+      <main className="mx-auto max-w-[1400px] px-4 py-6">
         {/* Upload */}
         <section className="mb-6">
           <div
@@ -317,7 +317,7 @@ export default function TierListApp() {
             <div key={idx} className="relative group/tier">
               <div className="flex items-stretch gap-3">
                 {/* Left tier label */}
-                <div className="w-28 shrink-0 rounded-2xl shadow-lg overflow-visible border" style={{borderColor: isDark? 'rgba(255,255,255,0.1)':'#e5e7eb'}}>
+                <div className="w-24 shrink-0 rounded-2xl shadow-lg overflow-visible border" style={{borderColor: isDark? 'rgba(255,255,255,0.1)':'#e5e7eb'}}>
                   <div className="relative h-full min-h-[64px] rounded-2xl overflow-visible grid place-items-center font-extrabold text-base text-slate-900 select-none" style={{ background:`linear-gradient(135deg, ${tier.color}, #ffffff)` }} onContextMenu={e=>{ e.preventDefault(); e.stopPropagation(); setOpenTierMenu(openTierMenu===idx? null: idx); }} onClick={e=> e.stopPropagation()}>
                     {editingTierIndex===idx ? (
                       <input autoFocus value={editingTierValue} onChange={e=> setEditingTierValue(e.target.value)} onBlur={commitEditTier} onKeyDown={e=> e.key==='Enter' && commitEditTier()} className="w-20 mx-1 rounded-lg px-1 py-0.5 bg-white/80 text-slate-900 text-sm focus:outline-none"/>
