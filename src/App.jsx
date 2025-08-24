@@ -1,11 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 /* @vite-ignore */
-// Arknights Tier – Clean (rev: Stable InsertIndex v2)
-// - Fix: same-tier left→right wouldn't cross (removed extra decrement when excluding dragged)
-// - Fix: tier hover flicker on thin gaps/edges (leave guard using expanded bounds)
-// - Perf: rAF + rect caching retained
-// - Visual: dragging item is semi-transparent in any tier
-// - Fix(2025-08-19): FitText null-ref race (double guard + alive flag)
+// Arknights Tier – Clean (rev: Stable InsertIndex v3)
+// - Row grouping insert index (vertical move works on 2+ lines)
+// - Nearest-row pick when y leaves band (prevents snap to end)
+// - Keeps hover sticky with leave guards
+// - FitText race guarded
 
 export default function TierListApp() {
   const [theme, setTheme] = useState(() => localStorage.getItem('clean-tier-theme') || 'light');
@@ -39,9 +38,8 @@ export default function TierListApp() {
   const cachedRectsRef = useRef({}); // { [tierIndex]: Rect[] }
   const rafRef = useRef(null);
   const pendingPosRef = useRef(null);
-  const lastPosRef = useRef(null); // track latest committed x,y
+  const lastPosRef = useRef(null);
 
-  // Tier 메뉴/호버 상태
   const [openTierMenu, setOpenTierMenu] = useState(null);
   const [hoverTierIndex, setHoverTierIndex] = useState(null);
   const [hoverInsertIndex, setHoverInsertIndex] = useState(null);
@@ -71,7 +69,7 @@ export default function TierListApp() {
     };
   }, []);
 
-  // global dragover to keep cursor even outside zones
+  // global dragover: 포인터 추적 + 어느 티어 안에 있는지
   useEffect(()=>{
     function onGlobalDragOver(e){
       lastPosRef.current = { x: e.clientX, y: e.clientY };
@@ -95,15 +93,15 @@ export default function TierListApp() {
 
   const itemById = useMemo(()=> Object.fromEntries(items.map(i=>[i.id,i])), [items]);
 
-  // smoke tests
+  // sanity checks
   useEffect(() => {
     try {
       console.assert(Array.isArray(tiers) && tiers.length >= 1, 'tiers initialized');
       console.assert(pool.length === items.length, 'pool equals items length initially');
       console.assert(clamp(5,0,3)===3 && clamp(-1,0,3)===0, 'clamp bounds');
       const a=[1,3]; const b=insertAt(a,1,2); console.assert(JSON.stringify(b)==='[1,2,3]' && a.length===2, 'insertAt');
-      console.assert(typeof uid()==='string' && uid().length>=6, 'uid looks ok');
-      console.assert(computeInsertIndex(null,0,0)===0, 'insertIndex safe on null container');
+      console.assert(typeof uid()==='string' && uid().length>=6, 'uid ok');
+      console.assert(computeInsertIndex(null,0,0)===0, 'insertIndex safe');
     } catch {}
   }, []);
 
@@ -111,7 +109,7 @@ export default function TierListApp() {
     e.dataTransfer.setData('text/plain', JSON.stringify(payload));
     e.dataTransfer.effectAllowed='move';
     setDragData(payload);
-    cachedRectsRef.current = {};
+    cachedRectsRef.current = {}; // invalidate
   }
   function onDragEnd(){
     setDragData(null);
@@ -145,59 +143,72 @@ export default function TierListApp() {
   }
   function onDropToPool(e){ e.preventDefault(); try{ const data=JSON.parse(e.dataTransfer.getData('text/plain')); moveItem({ id:data.id, from:data.from, to:'pool' }); }catch{} onDragEnd(); }
 
-  // === PATCHED: 카드 높이 포함 rect 수집 ===
+  // ------- rect 수집 (w,h 포함) -------
   function getCardRects(container){
-    if (!container) return [];
-    const cards = [...container.querySelectorAll('[data-role="card"]')];
-    return cards.map(el => {
-      const r = el.getBoundingClientRect();
+    if(!container) return [];
+    const cards=[...container.querySelectorAll('[data-role="card"]')];
+    return cards.map(el=>{
+      const r=el.getBoundingClientRect();
       const id = el.dataset.id;
-      return {
-        id,
-        cx: r.left + r.width / 2,
-        cy: r.top + r.height / 2,
-        left: r.left,
-        right: r.right,
-        top: r.top,
-        bottom: r.bottom,
-        w: r.width,
-        h: r.height,
-      };
+      return {id, cx:r.left+r.width/2, cy:r.top+r.height/2, left:r.left, right:r.right, top:r.top, bottom:r.bottom, w:r.width, h:r.height};
     });
   }
 
-  // === PATCHED: 세로 밴드 동적 계산(행 이동 안정화) ===
+  // ------- 핵심: 행(row) 기반 삽입 인덱스 -------
   function computeInsertIndex(container, x, y, excludeId){
-    if (!container) return 0;
+    if(!container) return 0;
     const tierIndex = Number(container?.dataset?.tierIndex ?? -1);
     let rects = cachedRectsRef.current[tierIndex];
-    if (!rects) {
-      rects = getCardRects(container);
-      cachedRectsRef.current[tierIndex] = rects;
-    }
-    if (!rects.length) return 0;
+    if(!rects){ rects = getCardRects(container); cachedRectsRef.current[tierIndex]=rects; }
+    if(!rects.length) return 0;
 
     // 같은 티어에서 끄는 카드 제외
-    let list = excludeId ? rects.filter(r => r.id !== excludeId) : rects.slice();
-    if (!list.length) return 0;
+    let list = excludeId ? rects.filter(r=> r.id !== excludeId) : rects.slice();
+    if(!list.length) return 0;
 
-    // 카드 높이에 비례한 세로 밴드 (작아도 안정적인 행 판정)
+    // 1) y(상단) 기준 정렬 후 "행"으로 그룹핑
+    list.sort((a,b)=> a.top===b.top ? a.left-b.left : a.top-b.top);
     const avgH = list.reduce((s, r) => s + (r.h || 0), 0) / list.length || 100;
-    const band = Math.max(avgH * 0.8, 90);
-
-    const rowList = list.filter(r => Math.abs(r.cy - y) <= band);
-    if (rowList.length) list = rowList;
-
-    // 가운데선 기준으로 좌우 위치 결정
-    let index = list.length;
-    for (let i = 0; i < list.length; i++) {
-      const r = list[i];
-      if (x < r.cx) { index = i; break; }
+    const rowThresh = Math.max(avgH * 0.6, 60); // 같은 행으로 묶을 y 임계값
+    /** rows: [{items:[rect...], top, bottom}] */
+    const rows = [];
+    for(const r of list){
+      const last = rows[rows.length-1];
+      if(!last || Math.abs(r.top - last.bottom) > rowThresh){
+        rows.push({ items:[r], top:r.top, bottom:r.bottom });
+      }else{
+        last.items.push(r);
+        last.top = Math.min(last.top, r.top);
+        last.bottom = Math.max(last.bottom, r.bottom);
+      }
     }
-    return clamp(index, 0, list.length);
+    // 각 행 내부는 좌→우 정렬
+    rows.forEach(row=> row.items.sort((a,b)=> a.left-b.left));
+
+    // 2) 포인터 y에 가장 가까운 행 선택(살짝 벗어나도 가장 가까운 행 사용)
+    let targetRowIndex = 0;
+    let bestDist = Infinity;
+    for(let i=0;i<rows.length;i++){
+      const row = rows[i];
+      const cy = (row.top + row.bottom) / 2;
+      const d = Math.abs(y - cy);
+      if(d < bestDist){ bestDist = d; targetRowIndex = i; }
+    }
+    const targetRow = rows[targetRowIndex];
+
+    // 3) 선택된 행 내에서 x 기준으로 위치 결정
+    let within = targetRow.items.length;
+    for(let i=0;i<targetRow.items.length;i++){
+      if(x < targetRow.items[i].cx){ within = i; break; }
+    }
+
+    // 4) 앞선 모든 행의 아이템 수 + within = 최종 인덱스
+    const before = rows.slice(0, targetRowIndex).reduce((s,row)=> s + row.items.length, 0);
+    const absIndex = before + within;
+    return clamp(absIndex, 0, list.length);
   }
 
-  // helper: is pointer inside tier (with margin)
+  // helper: 포인터가 티어 안에 있는지
   const isPointInsideTier = (tierIdx, margin=12) => {
     const p = lastPosRef.current; const el = tierContainerRefs.current[tierIdx];
     if(!p || !el) return false; const r = el.getBoundingClientRect();
@@ -375,7 +386,7 @@ export default function TierListApp() {
                       });
                     }
                   }}
-                  onDragLeave={(e)=> { 
+                  onDragLeave={()=>{ 
                     const c = tierContainerRefs.current[idx];
                     const r = c?.getBoundingClientRect();
                     const m = 16;
@@ -468,7 +479,7 @@ function DraggableItem({ item, onDragStart, justPopped, index, isDark, onRename,
           : <div className={`${isDark?'bg-slate-700/70 text-white/70':'bg-slate-100 text-slate-400'} w-full h-full flex items-center justify-center text-xs`}>IMG</div>}
         </div>
       <div className={`item-name ${isDark? 'bg-slate-900/35 text-white':'bg-white/85 text-slate-900'}`}>
-        <FitText text={item.label} maxFont={14} minFont={7} maxLines={2} />
+        <FitText text={item.label} maxFont={14} minFont={7} maxLines={1} />
       </div>
     </div>
   );
@@ -480,7 +491,7 @@ function GhostPreview({item,isDark}){
     <div className={`item-card ghost-card border-2 ${isDark?'bg-slate-800/50 border-white/20':'bg-white/60 border-slate-300/60'}`} data-role="card-ghost">
       <div className="item-img" style={{opacity:.6}}>{item.image? <img src={item.image} alt="ghost" className="img-el"/> : <div className={`${isDark?'bg-slate-700/60 text-white/50':'bg-slate-100 text-slate-400'} w-full h-full flex items-center justify-center text-xs`}>IMG</div>}</div>
       <div className={`item-name ${isDark? 'bg-slate-900/25 text-white/80':'bg-white/70 text-slate-800'}`} style={{opacity:.9}}>
-        <FitText text={item.label} maxFont={14} minFont={7} maxLines={2} />
+        <FitText text={item.label} maxFont={14} minFont={7} maxLines={1} />
       </div>
     </div>
   );
@@ -490,11 +501,11 @@ function FitText({ text, maxFont=20, minFont=10, maxLines=2 }){
   const ref = useRef(null);
   useEffect(()=>{
     const el = ref.current;
-    if(!el) return; // guard 1
+    if(!el) return;
     let alive = true;
     let size = maxFont; let iter = 0;
     const apply = () => {
-      if(!alive || !el) return; // guard 2
+      if(!alive || !el) return;
       try {
         el.style.fontSize = size+'px';
         el.style.display='-webkit-box';
