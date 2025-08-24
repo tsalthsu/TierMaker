@@ -401,10 +401,10 @@ export default function TierListApp() {
       </main>
 
       <style>{`
-        .item-card { position: relative; width: 112px; height: 164px; border-radius: 18px; display: flex; flex-direction: column; overflow: visible; }
-        .item-img { width: 100%; height: 106px; overflow: hidden; border-top-left-radius: 18px; border-top-right-radius: 18px; }
+        .item-card { position: relative; width: 78px; height: 115px; border-radius: 14px; display: flex; flex-direction: column; overflow: visible; }
+        .item-img { width: 100%; height: 74px; overflow: hidden; border-top-left-radius: 14px; border-top-right-radius: 14px; }
         .item-card .img-el { width: 100%; height: 100%; object-fit: cover; }
-        .item-name { height: 52px; display: grid; place-items: center; padding: 4px 6px; font-weight: 800; text-align: center; line-height: 1.05; border-bottom-left-radius: 18px; border-bottom-right-radius: 18px; backdrop-filter: saturate(120%) blur(2px); overflow: hidden; }
+        .item-name { height: 36px; display: grid; place-items: center; padding: 3px 4px; font-weight: 800; text-align: center; line-height: 1.05; border-bottom-left-radius: 14px; border-bottom-right-radius: 14px; backdrop-filter: saturate(120%) blur(2px); overflow: hidden; }
         .item-card:after { content: ""; position: absolute; inset: -1px; border-radius: 18px; pointer-events: none; opacity: 0; transition: opacity .2s ease; background: radial-gradient(120px 80px at var(--mx,50%) var(--my,50%), rgba(255,255,255,.15), transparent 50%); }
         .item-card:hover:after { opacity: 1; }
         .animate-pop { animation: pop .4s cubic-bezier(.2,1,.4,1); }
@@ -445,7 +445,7 @@ function DraggableItem({ item, onDragStart, justPopped, index, isDark, onRename,
 
       <div className="item-img">{item.image? <img src={item.image} alt={item.label} className="img-el"/> : <div className={`${isDark?'bg-slate-700/70 text-white/70':'bg-slate-100 text-slate-400'} w-full h-full flex items-center justify-center text-xs`}>IMG</div>}</div>
       <div className={`item-name ${isDark? 'bg-slate-900/35 text-white':'bg-white/85 text-slate-900'}`}>
-        <FitText text={item.label} maxFont={20} minFont={10} maxLines={2} />
+        <FitText text={item.label} maxFont={14} minFont={7}  maxLines={2} />
       </div>
     </div>
   );
@@ -457,7 +457,7 @@ function GhostPreview({item,isDark}){
     <div className={`item-card ghost-card border-2 ${isDark?'bg-slate-800/50 border-white/20':'bg-white/60 border-slate-300/60'}`} data-role="card-ghost">
       <div className="item-img" style={{opacity:.6}}>{item.image? <img src={item.image} alt="ghost" className="img-el"/> : <div className={`${isDark?'bg-slate-700/60 text-white/50':'bg-slate-100 text-slate-400'} w-full h-full flex items-center justify-center text-xs`}>IMG</div>}</div>
       <div className={`item-name ${isDark? 'bg-slate-900/25 text-white/80':'bg-white/70 text-slate-800'}`} style={{opacity:.9}}>
-        <FitText text={item.label} maxFont={20} minFont={10} maxLines={2} />
+        <FitText text={item.label} maxFont={14} minFont={7}  maxLines={2} />
       </div>
     </div>
   );
