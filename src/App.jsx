@@ -445,7 +445,7 @@ function DraggableItem({ item, onDragStart, justPopped, index, isDark, onRename,
 
       <div className="item-img">{item.image? <img src={item.image} alt={item.label} className="img-el"/> : <div className={`${isDark?'bg-slate-700/70 text-white/70':'bg-slate-100 text-slate-400'} w-full h-full flex items-center justify-center text-xs`}>IMG</div>}</div>
       <div className={`item-name ${isDark? 'bg-slate-900/35 text-white':'bg-white/85 text-slate-900'}`}>
-        <FitText text={item.label} maxFont={14} minFont={7}  maxLines={2} />
+        <FitText text={item.label} maxFont={14} minFont={7}  maxLines={1} />
       </div>
     </div>
   );
@@ -457,7 +457,7 @@ function GhostPreview({item,isDark}){
     <div className={`item-card ghost-card border-2 ${isDark?'bg-slate-800/50 border-white/20':'bg-white/60 border-slate-300/60'}`} data-role="card-ghost">
       <div className="item-img" style={{opacity:.6}}>{item.image? <img src={item.image} alt="ghost" className="img-el"/> : <div className={`${isDark?'bg-slate-700/60 text-white/50':'bg-slate-100 text-slate-400'} w-full h-full flex items-center justify-center text-xs`}>IMG</div>}</div>
       <div className={`item-name ${isDark? 'bg-slate-900/25 text-white/80':'bg-white/70 text-slate-800'}`} style={{opacity:.9}}>
-        <FitText text={item.label} maxFont={14} minFont={7}  maxLines={2} />
+        <FitText text={item.label} maxFont={14} minFont={7}  maxLines={1} />
       </div>
     </div>
   );
