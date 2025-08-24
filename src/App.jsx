@@ -443,7 +443,11 @@ function DraggableItem({ item, onDragStart, justPopped, index, isDark, onRename,
         </div>
       )}
 
-      <div className="item-img">{item.image? <img src={item.image} alt={item.label} className="img-el"/> : <div className={`${isDark?'bg-slate-700/70 text-white/70':'bg-slate-100 text-slate-400'} w-full h-full flex items-center justify-center text-xs`}>IMG</div>}</div>
+      <div className="item-img">
+        {item.image
+          ? <img src={item.image} alt={item.label} className="img-el" draggable={false}/>
+          : <div className={`${isDark?'bg-slate-700/70 text-white/70':'bg-slate-100 text-slate-400'} w-full h-full flex items-center justify-center text-xs`}>IMG</div>}
+        </div>
       <div className={`item-name ${isDark? 'bg-slate-900/35 text-white':'bg-white/85 text-slate-900'}`}>
         <FitText text={item.label} maxFont={14} minFont={7}  maxLines={1} />
       </div>
