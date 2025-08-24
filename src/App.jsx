@@ -155,58 +155,72 @@ export default function TierListApp() {
   }
 
   // ------- 핵심: 행(row) 기반 삽입 인덱스 -------
-  function computeInsertIndex(container, x, y, excludeId){
-    if(!container) return 0;
-    const tierIndex = Number(container?.dataset?.tierIndex ?? -1);
-    let rects = cachedRectsRef.current[tierIndex];
-    if(!rects){ rects = getCardRects(container); cachedRectsRef.current[tierIndex]=rects; }
-    if(!rects.length) return 0;
+function computeInsertIndex(container, x, y, excludeId){
+  if(!container) return 0;
+  const tierIndex = Number(container?.dataset?.tierIndex ?? -1);
+  let rects = cachedRectsRef.current[tierIndex];
+  if(!rects){ rects = getCardRects(container); cachedRectsRef.current[tierIndex]=rects; }
+  if(!rects.length) return 0;
 
-    // 같은 티어에서 끄는 카드 제외
-    let list = excludeId ? rects.filter(r=> r.id !== excludeId) : rects.slice();
-    if(!list.length) return 0;
+  // 같은 티어에서 끄는 카드 제외
+  let list = excludeId ? rects.filter(r=> r.id !== excludeId) : rects.slice();
+  if(!list.length) return 0;
 
-    // 1) y(상단) 기준 정렬 후 "행"으로 그룹핑
-    list.sort((a,b)=> a.top===b.top ? a.left-b.left : a.top-b.top);
-    const avgH = list.reduce((s, r) => s + (r.h || 0), 0) / list.length || 100;
-    const rowThresh = Math.max(avgH * 0.6, 60); // 같은 행으로 묶을 y 임계값
-    /** rows: [{items:[rect...], top, bottom}] */
-    const rows = [];
-    for(const r of list){
-      const last = rows[rows.length-1];
-      if(!last || Math.abs(r.top - last.bottom) > rowThresh){
-        rows.push({ items:[r], top:r.top, bottom:r.bottom });
-      }else{
-        last.items.push(r);
-        last.top = Math.min(last.top, r.top);
-        last.bottom = Math.max(last.bottom, r.bottom);
-      }
+  // 1) top → left로 정렬
+  list.sort((a,b)=> (a.top===b.top ? a.left-b.left : a.top-b.top));
+
+  // 2) "같은 행" 묶기: 기준은 같은 행의 top 평균과의 차이
+  //    (이전 버전처럼 last.bottom 기준이 아니라 refTop(평균 top) 기준으로 묶어야 함)
+  const avgH = list.reduce((s, r) => s + (r.h || 0), 0) / list.length || 100;
+  const rowThresh = Math.max(avgH * 0.35, 28); // 같은 행으로 볼 y 허용 오차
+
+  const rows = [];
+  let refTop = null;
+  for(const r of list){
+    if(rows.length===0){
+      rows.push({ items:[r], refTop: r.top, top:r.top, bottom:r.bottom });
+      refTop = r.top;
+      continue;
     }
-    // 각 행 내부는 좌→우 정렬
-    rows.forEach(row=> row.items.sort((a,b)=> a.left-b.left));
-
-    // 2) 포인터 y에 가장 가까운 행 선택(살짝 벗어나도 가장 가까운 행 사용)
-    let targetRowIndex = 0;
-    let bestDist = Infinity;
-    for(let i=0;i<rows.length;i++){
-      const row = rows[i];
-      const cy = (row.top + row.bottom) / 2;
-      const d = Math.abs(y - cy);
-      if(d < bestDist){ bestDist = d; targetRowIndex = i; }
+    const cur = rows[rows.length-1];
+    // 현재 행의 refTop(평균 top)과 비교해서 같은 행인지 판단
+    const sameRow = Math.abs(r.top - cur.refTop) <= rowThresh;
+    if(sameRow){
+      cur.items.push(r);
+      // refTop 갱신(부드럽게 평균)
+      cur.refTop = (cur.refTop * (cur.items.length-1) + r.top) / cur.items.length;
+      cur.top = Math.min(cur.top, r.top);
+      cur.bottom = Math.max(cur.bottom, r.bottom);
+    }else{
+      rows.push({ items:[r], refTop: r.top, top:r.top, bottom:r.bottom });
     }
-    const targetRow = rows[targetRowIndex];
-
-    // 3) 선택된 행 내에서 x 기준으로 위치 결정
-    let within = targetRow.items.length;
-    for(let i=0;i<targetRow.items.length;i++){
-      if(x < targetRow.items[i].cx){ within = i; break; }
-    }
-
-    // 4) 앞선 모든 행의 아이템 수 + within = 최종 인덱스
-    const before = rows.slice(0, targetRowIndex).reduce((s,row)=> s + row.items.length, 0);
-    const absIndex = before + within;
-    return clamp(absIndex, 0, list.length);
   }
+  // 각 행 내부는 좌→우 정렬 보장
+  rows.forEach(row=> row.items.sort((a,b)=> a.left-b.left));
+
+  // 3) 포인터 y에 가장 가까운 행 선택(살짝 벗어나도 가장 가까운 행)
+  let targetRowIndex = 0;
+  let bestDist = Infinity;
+  for(let i=0;i<rows.length;i++){
+    const row = rows[i];
+    const cy = (row.top + row.bottom) / 2;
+    const d = Math.abs(y - cy);
+    if(d < bestDist){ bestDist = d; targetRowIndex = i; }
+  }
+  const targetRow = rows[targetRowIndex];
+
+  // 4) 선택된 행에서 x 기준으로 끼워넣을 위치 계산
+  let within = targetRow.items.length;
+  for(let i=0;i<targetRow.items.length;i++){
+    if(x < targetRow.items[i].cx){ within = i; break; }
+  }
+
+  // 5) 앞선 행들의 아이템 수 + within = 절대 인덱스
+  const before = rows.slice(0, targetRowIndex).reduce((s,row)=> s + row.items.length, 0);
+  const absIndex = before + within;
+  return clamp(absIndex, 0, list.length);
+}
+
 
   // helper: 포인터가 티어 안에 있는지
   const isPointInsideTier = (tierIdx, margin=12) => {
