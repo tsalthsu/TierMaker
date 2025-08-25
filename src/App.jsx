@@ -1,27 +1,19 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 /* @vite-ignore */
-// Arknights Tier – Clean (Save 4 + Reset confirm + Ops6 double-click guard)
-// - Row-based insert index (multiline precise reordering)
-// - Ghost preview & sticky hover
-// - FitText race guards
-// - NEW: Reset confirmation (red button)
-// - NEW: 6★ fetch loading state + double-click guard (“이미 추가되어 있습니다”)
+// Arknights Tier – Clean (Save 6: Reset Modal + Ops6 re-click warn)
+// - Base: Save 5 (empty defaults + ops loading guard)
+// - Add: 초기화 모달 팝업(빨강 확인 / 취소)
+// - Add: 6성 불러오기 2번째 클릭 시 경고
+// - Keep: Save4 행 기반 삽입 인덱싱(상하/좌우 모두 자연스럽게)
 
 export default function TierListApp() {
   const [theme, setTheme] = useState(() => localStorage.getItem('clean-tier-theme') || 'light');
   useEffect(() => { localStorage.setItem('clean-tier-theme', theme); }, [theme]);
   const isDark = theme === 'dark';
 
-  // === core states ===
-  const [items, setItems] = useState(() => [
-    { id: uid(), label: "SilverAsh", image: "" },
-    { id: uid(), label: "Ch'en", image: "" },
-    { id: uid(), label: "Surtr", image: "" },
-    { id: uid(), label: "Thorns", image: "" },
-    { id: uid(), label: "Eyjafjalla", image: "" },
-    { id: uid(), label: "Kal'tsit", image: "" },
-  ]);
-  const [pool, setPool] = useState(() => items.map(i=>i.id));
+  // 기본 아이템 제거 (빈 상태 시작)
+  const [items, setItems] = useState(() => []);
+  const [pool, setPool] = useState(() => []);
   const [tiers, setTiers] = useState(() => [
     { name: 'S', color: '#60a5fa', items: [] },
     { name: 'A', color: '#34d399', items: [] },
@@ -29,11 +21,6 @@ export default function TierListApp() {
     { name: 'C', color: '#f97316', items: [] },
     { name: 'D', color: '#ef4444', items: [] },
   ]);
-
-  // NEW: UI guards for ops6 + reset
-  const [ops6Added, setOps6Added] = useState(false);
-  const [loadingOps, setLoadingOps] = useState(false);
-  const [confirmReset, setConfirmReset] = useState(false);
 
   const [dragData, setDragData] = useState(null);
   const [justPoppedId, setJustPoppedId] = useState(null);
@@ -45,14 +32,21 @@ export default function TierListApp() {
   const cachedRectsRef = useRef({}); // { [tierIndex]: Rect[] }
   const rafRef = useRef(null);
   const pendingPosRef = useRef(null);
-  const lastPosRef = useRef(null);
+  const lastPosRef = useRef(null); // track latest committed x,y
 
-  // Tier menu / hover states
+  // 티어 메뉴/호버 상태
   const [openTierMenu, setOpenTierMenu] = useState(null);
   const [hoverTierIndex, setHoverTierIndex] = useState(null);
   const [hoverInsertIndex, setHoverInsertIndex] = useState(null);
 
-  // global end handler
+  // 초기화 모달
+  const [showResetModal, setShowResetModal] = useState(false);
+
+  // ops6 재클릭 경고 플래그 + 로딩
+  const [ops6Added, setOps6Added] = useState(false);
+  const [loadingOps, setLoadingOps] = useState(false);
+
+  // 전역 드래그 종료 핸들러
   const endRef = useRef(()=>{});
   useEffect(()=>{ endRef.current = onDragEnd; });
   useEffect(()=>{ const handler=()=> endRef.current();
@@ -65,10 +59,10 @@ export default function TierListApp() {
     return ()=>{ window.removeEventListener('dragend', handler); window.removeEventListener('drop', handler); window.removeEventListener('dragcancel', handler); window.removeEventListener('pointerup', handler); window.removeEventListener('blur', handler); document.removeEventListener('mouseleave', handler); };
   },[]);
 
-  // close tier menu by outside / ESC
+  // 티어 메뉴 닫기
   useEffect(() => {
     const onDoc = () => setOpenTierMenu(null);
-    const onKey = (e) => { if (e.key === 'Escape') setOpenTierMenu(null); };
+    const onKey = (e) => { if (e.key === 'Escape') { setOpenTierMenu(null); setShowResetModal(false); } };
     document.addEventListener('click', onDoc);
     document.addEventListener('keydown', onKey);
     return () => {
@@ -77,7 +71,7 @@ export default function TierListApp() {
     };
   }, []);
 
-  // keep pointer position while dragging
+  // global dragover(좌표 유지)
   useEffect(()=>{
     function onGlobalDragOver(e){
       lastPosRef.current = { x: e.clientX, y: e.clientY };
@@ -94,7 +88,7 @@ export default function TierListApp() {
     return ()=> window.removeEventListener('dragover', onGlobalDragOver);
   },[]);
 
-  // paste image support
+  // 붙여넣기 이미지 지원
   useEffect(()=>{
     function onPaste(e){ const items=e.clipboardData?.items; if(!items) return; const files=[]; for(const it of items){ if(it.kind==='file'){ const f=it.getAsFile(); if(f && f.type.startsWith('image/')) files.push(f); } } if(files.length){ e.preventDefault(); addFilesAsItems(files);} }
     window.addEventListener('paste',onPaste); return ()=> window.removeEventListener('paste',onPaste);
@@ -102,19 +96,17 @@ export default function TierListApp() {
 
   const itemById = useMemo(()=> Object.fromEntries(items.map(i=>[i.id,i])), [items]);
 
-  // smoke tests
+  // 간단 테스트
   useEffect(() => {
     try {
       console.assert(Array.isArray(tiers) && tiers.length >= 1, 'tiers initialized');
-      console.assert(pool.length === items.length, 'pool equals items length initially');
       console.assert(clamp(5,0,3)===3 && clamp(-1,0,3)===0, 'clamp bounds');
       const a=[1,3]; const b=insertAt(a,1,2); console.assert(JSON.stringify(b)==='[1,2,3]' && a.length===2, 'insertAt');
-      console.assert(typeof uid()==='string' && uid().length>=6, 'uid looks ok');
-      console.assert(computeInsertIndex(null,0,0)===0, 'insertIndex safe on null container');
+      console.assert(typeof uid()==='string' && uid().length>=6, 'uid ok');
+      console.assert(computeInsertIndex(null,0,0)===0, 'insertIndex null safe');
     } catch {}
   }, []);
 
-  // DnD
   function onDragStart(e,payload){
     e.dataTransfer.setData('text/plain', JSON.stringify(payload));
     e.dataTransfer.effectAllowed='move';
@@ -161,19 +153,14 @@ export default function TierListApp() {
       const id = el.dataset.id;
       return {
         id,
-        cx: r.left + r.width/2,
-        cy: r.top + r.height/2,
-        left: r.left,
-        right: r.right,
-        top: r.top,
-        bottom: r.bottom,
-        w: r.width,
-        h: r.height, // for row grouping
+        cx:r.left+r.width/2, cy:r.top+r.height/2,
+        left:r.left, right:r.right, top:r.top, bottom:r.bottom,
+        w:r.width, h:r.height
       };
     });
   }
 
-  // ------- 핵심: 행(row) 기반 삽입 인덱스 (정밀판) -------
+  // ---- Save4 행(row) 기반 인덱싱 (정리판) ----
   function computeInsertIndex(container, x, y, excludeId){
     if(!container) return 0;
     const tierIndex = Number(container?.dataset?.tierIndex ?? -1);
@@ -181,20 +168,20 @@ export default function TierListApp() {
     if(!rects){ rects = getCardRects(container); cachedRectsRef.current[tierIndex]=rects; }
     if(!rects.length) return 0;
 
-    // 같은 티어에서 끄는 카드 제외
+    // 같은 티어 드래그면 자기 자신 제외
     let list = excludeId ? rects.filter(r=> r.id !== excludeId) : rects.slice();
     if(!list.length) return 0;
 
-    // 1) top → left 정렬
+    // 1) top -> left 정렬
     list.sort((a,b)=> (a.top===b.top ? a.left-b.left : a.top-b.top));
 
-    // 2) 행 묶기
+    // 2) 행 묶기 (평균 top 기반)
     const avgH = list.reduce((s, r) => s + (r.h || 0), 0) / list.length || 100;
-    const rowThresh = Math.max(avgH * 0.35, 28);
+    const rowThresh = Math.max(avgH * 0.35, 28); // 같은 행으로 볼 y 허용 오차
 
     const rows = [];
     for(const r of list){
-      if(rows.length===0){
+      if(!rows.length){
         rows.push({ items:[r], refTop:r.top, top:r.top, bottom:r.bottom });
         continue;
       }
@@ -211,17 +198,17 @@ export default function TierListApp() {
     }
     rows.forEach(row=> row.items.sort((a,b)=> a.left-b.left));
 
-    // 3) 포인터 y에 가장 가까운 행
-    let targetRowIndex = 0, bestDist = Infinity;
+    // 3) 포인터 y에 가장 가까운 행 선택
+    let targetRowIndex = 0, best = Infinity;
     for(let i=0;i<rows.length;i++){
       const row = rows[i];
       const cy = (row.top + row.bottom) / 2;
       const d = Math.abs(y - cy);
-      if(d < bestDist){ bestDist = d; targetRowIndex = i; }
+      if(d < best){ best = d; targetRowIndex = i; }
     }
     const targetRow = rows[targetRowIndex];
 
-    // 4) 선택된 행에서 x 기준 삽입
+    // 4) 선택된 행에서 x 기준으로 위치
     let within = targetRow.items.length;
     for(let i=0;i<targetRow.items.length;i++){
       if(x < targetRow.items[i].cx){ within = i; break; }
@@ -233,6 +220,7 @@ export default function TierListApp() {
     return clamp(absIndex, 0, list.length);
   }
 
+  // helper: 포인터가 해당 티어 안에 있는지
   const isPointInsideTier = (tierIdx, margin=12) => {
     const p = lastPosRef.current; const el = tierContainerRefs.current[tierIdx];
     if(!p || !el) return false; const r = el.getBoundingClientRect();
@@ -241,7 +229,6 @@ export default function TierListApp() {
 
   function triggerSparkles(x,y){ const id=uid(); const N=12; const arr=Array.from({length:N}).map((_,i)=>({ id:`${id}-${i}`, x,y, createdAt:Date.now(), angle:(Math.PI*2*i)/N + (Math.random()*0.4-0.2), dist:40+Math.random()*30 })); setSparkles(prev=>[...prev,...arr]); }
 
-  // tier edits
   const [editingTierIndex,setEditingTierIndex]=useState(null);
   const [editingTierValue,setEditingTierValue]=useState('');
   function startEditTier(i){ setEditingTierIndex(i); setEditingTierValue(tiers[i].name); }
@@ -250,19 +237,19 @@ export default function TierListApp() {
   function removeTier(idx){ setTiers(prev=>{ const copy=prev.map(t=>({...t,items:[...t.items]})); const back=copy[idx].items; const next=copy.filter((_,i)=> i!==idx); setPool(p=>[...p,...back]); return next; }); }
   function setTierColor(idx,color){ setTiers(prev=> prev.map((t,i)=> i===idx? {...t,color} : t)); }
 
-  // add items
   const [newLabel,setNewLabel]=useState('');
   const [newImgUrl,setNewImgUrl]=useState('');
   function onSelectFiles(e){ const files=[...(e.target.files||[])]; if(files.length) addFilesAsItems(files); e.target.value=''; }
   function addFilesAsItems(files){ const readers=files.map(file=> new Promise(res=>{ const r=new FileReader(); r.onload=()=> res({name:file.name.replace(/\.[^.]+$/, ''), dataUrl:r.result}); r.readAsDataURL(file); })); Promise.all(readers).then(list=>{ const created=list.map(({name,dataUrl})=> ({id:uid(), label:name, image:dataUrl})); setItems(prev=>[...prev,...created]); setPool(prev=>[...prev,...created.map(c=>c.id)]); }); }
   function addNewItem(label,image){ const id=uid(); const item={id, label:label||'새 아이템', image:image||newImgUrl||''}; setItems(p=>[...p,item]); setPool(p=>[...p,id]); setNewLabel(''); setNewImgUrl(''); }
 
-  // ---- 6성 불러오기: /api/ops6 (with loading + double-click guard) ----
+  // ---- 6성 불러오기: /api/ops6 (로딩+중복 실행 방지 + 재클릭 경고) ----
   async function loadSixFromOps() {
-    try {
-      if (ops6Added) { alert('이미 6★ 목록이 추가되어 있습니다.'); return; }
-      setLoadingOps(true);
+    if (loadingOps) return; // 연속 클릭 방지
+    if (ops6Added) { alert('이미 추가되어 있습니다. 초기화 후 다시 시도하세요.'); return; }
 
+    setLoadingOps(true);
+    try {
       const r = await fetch('/api/ops6', { headers: { 'Accept': 'application/json' } });
       if (!r.ok) throw new Error('불러오기 실패');
       const raw = await r.json();
@@ -275,11 +262,7 @@ export default function TierListApp() {
         ? raw.result
         : [];
 
-      if (!arr.length) {
-        alert('가져올 항목이 없습니다. (/api/ops6 응답 확인)');
-        setLoadingOps(false);
-        return;
-      }
+      if (!arr.length) { alert('가져올 항목이 없습니다. (/api/ops6 응답 확인)'); return; }
 
       const normalized = arr
         .map((x) => {
@@ -302,21 +285,13 @@ export default function TierListApp() {
         dedup.push(it);
       }
 
-      if (!dedup.length) {
-        alert('새로 추가할 항목이 없습니다.');
-        // 그래도 “불러오기 실행”은 했으므로 재클릭 방지 위해 플래그 세우지 않음
-        setLoadingOps(false);
-        return;
-      }
+      if (!dedup.length) { alert('새로 추가할 항목이 없습니다.'); return; }
 
-      const created = dedup.map(({ label, image }) => ({
-        id: uid(),
-        label,
-        image,
-      }));
+      const created = dedup.map(({ label, image }) => ({ id: uid(), label, image }));
       setItems((p) => [...p, ...created]);
       setPool((p) => [...p, ...created.map((c) => c.id)]);
-      setOps6Added(true); // 이후 재클릭 시 경고
+
+      setOps6Added(true); // 재클릭 시 경고
       alert(`6★ ${created.length}개 추가됨`);
     } catch (e) {
       console.error(e);
@@ -326,12 +301,12 @@ export default function TierListApp() {
     }
   }
 
-  // reset with confirmation; also allow re-import after real reset
+  // 초기화 실제 수행 (모달에서 확인 시)
   function doReset() {
-    setPool(items.map(i=>i.id));
-    setTiers(prev=> prev.map(t=>({...t,items:[]})));
-    setOps6Added(false);
-    setConfirmReset(false);
+    setPool(items.map(i=>i.id));                       // 모든 아이템을 풀로
+    setTiers(prev=> prev.map(t=>({...t,items:[]})));   // 각 티어 비우기
+    setOps6Added(false);                               // ops6 재시도 가능
+    setShowResetModal(false);
   }
 
   return (
@@ -339,6 +314,27 @@ export default function TierListApp() {
       <GooDefs/>
       <div ref={overlayRef} className="pointer-events-none fixed inset-0 z-50">{sparkles.map(s=> <Sparkle key={s.id} x={s.x} y={s.y} angle={s.angle} dist={s.dist}/> )}</div>
       <ThemeToggle isDark={isDark} onToggle={()=> setTheme(isDark?'light':'dark')} />
+
+      {/* 초기화 모달 */}
+      {showResetModal && (
+        <Modal onClose={()=> setShowResetModal(false)} isDark={isDark}>
+          <div className="text-center space-y-4">
+            <h3 className="text-lg font-bold">정말 초기화할까요?</h3>
+            <p className="text-sm opacity-80">모든 티어 배치를 비우고 풀로 되돌립니다.</p>
+            <div className="flex justify-center gap-3 pt-2">
+              <button
+                onClick={()=> setShowResetModal(false)}
+                className={`px-4 py-2 rounded-xl border ${isDark?'bg-white/10 border-white/10':'bg-white border-slate-200'}`}
+              >취소</button>
+              <button
+                onClick={doReset}
+                className="px-4 py-2 rounded-xl text-white shadow-lg"
+                style={{background:'linear-gradient(180deg,#fb7185,#ef4444)'}}
+              >정말 초기화</button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       <header className={`sticky top-0 z-30 backdrop-blur border-b ${isDark?'bg-slate-900/50 border-white/10':'bg-white/70 border-slate-200/70'}`}>
         <div className="mx-auto max-w-[1400px] px-4 py-4 flex items-center justify-between">
@@ -348,28 +344,9 @@ export default function TierListApp() {
           </div>
           <div className="flex items-center gap-2 md:gap-3">
             <BlobButton onClick={addTier}>티어 추가</BlobButton>
-
-            {!confirmReset ? (
-              <BlobButton onClick={()=> setConfirmReset(true)}>초기화</BlobButton>
-            ) : (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={()=> setConfirmReset(false)}
-                  className={`px-3 py-2 rounded-2xl border ${isDark?'bg-white/10 border-white/10 text-white':'bg-white border-slate-200 text-slate-900'} shadow-sm`}
-                >
-                  취소
-                </button>
-                <BlobButton variant="danger" onClick={doReset}>정말 초기화</BlobButton>
-              </div>
-            )}
-
-            <BlobButton
-              onClick={loadSixFromOps}
-              disabled={loadingOps || ops6Added}
-              loading={loadingOps}
-              title={ops6Added ? '이미 불러왔습니다' : '6성 불러오기'}
-            >
-              {ops6Added ? '이미 불러옴' : (loadingOps ? '불러오는 중…' : '6성 불러오기')}
+            <BlobButton onClick={()=> setShowResetModal(true)}>초기화</BlobButton>
+            <BlobButton onClick={loadSixFromOps} disabled={loadingOps} loading={loadingOps}>
+              {loadingOps ? '불러오는 중…' : '6성 불러오기'}
             </BlobButton>
           </div>
         </div>
@@ -422,7 +399,7 @@ export default function TierListApp() {
                         <label className="flex items-center justify-between text-sm mb-2">색 변경
                           <input type="color" value={tier.color} onChange={e=> setTierColor(idx, e.target.value)} className="w-6 h-6 border-0 p-0 bg-transparent cursor-pointer" />
                         </label>
-                        <button onClick={()=> startEditTier(idx)} className="w-full text-left text-sm px-2 py-1 rounded-lg hover:bg:black/5">이름 변경</button>
+                        <button onClick={()=> startEditTier(idx)} className="w-full text-left text-sm px-2 py-1 rounded-lg hover:bg-black/5">이름 변경</button>
                         <button onClick={()=> { removeTier(idx); setOpenTierMenu(null); }} className="w-full text-left text-sm px-2 py-1 rounded-lg hover:bg-black/5 text-rose-500">티어 삭제</button>
                       </div>
                     )}
@@ -449,7 +426,7 @@ export default function TierListApp() {
                       });
                     }
                   }}
-                  onDragLeave={(e)=> { 
+                  onDragLeave={()=> { 
                     const c = tierContainerRefs.current[idx];
                     const r = c?.getBoundingClientRect();
                     const m = 16;
@@ -514,9 +491,13 @@ export default function TierListApp() {
           background: transparent;
         }
         .ghost-card{opacity:.65; outline-offset:-2px;}
-        /* loading spinner (button) */
+
+        /* 버튼 로딩 스피너 */
         .spin { animation: spin 1s linear infinite; }
-        @keyframes spin { from { transform: rotate(0deg);} to { transform: rotate(360deg);} }
+        @keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }
+
+        /* 모달 */
+        .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: grid; place-items: center; z-index: 80; }
       `}</style>
     </div>
   );
@@ -528,19 +509,7 @@ function DraggableItem({ item, onDragStart, justPopped, index, isDark, onRename,
   useEffect(()=>{ const onDoc=e=>{ if(ref.current && !ref.current.contains(e.target)) setOpen(false); }; const onKey=e=>{ if(e.key==='Escape') setOpen(false); }; document.addEventListener('click',onDoc); document.addEventListener('keydown',onKey); return ()=>{ document.removeEventListener('click',onDoc); document.removeEventListener('keydown',onKey); }; },[]);
 
   return (
-    <div
-      ref={ref}
-      data-role="card"
-      data-id={item.id}
-      onContextMenu={e=>{ e.preventDefault(); setOpen(true); }}
-      draggable
-      onDragStart={e=>{
-        onDragStart&&onDragStart(e,{});
-        const r=ref.current?.getBoundingClientRect();
-        if(r){ e.currentTarget.style.setProperty('--mx', `${e.clientX-r.left}px`); e.currentTarget.style.setProperty('--my', `${e.clientY-r.top}px`); }
-      }}
-      className={`item-card group select-none border shadow-lg hover:-translate-y-0.5 transition transform ${justPopped?'animate-pop':''} ${isDark?'bg-slate-800/80 border-white/10':'bg-white/90 border-slate-200'} ${isDragging?'opacity-50':''}`}
-    >
+    <div ref={ref} data-role="card" data-id={item.id} onContextMenu={e=>{ e.preventDefault(); setOpen(true); }} draggable onDragStart={e=>{ onDragStart&&onDragStart(e,{id:item.id, from:undefined}); const r=ref.current?.getBoundingClientRect(); if(r){ e.currentTarget.style.setProperty('--mx', `${e.clientX-r.left}px`); e.currentTarget.style.setProperty('--my', `${e.clientY-r.top}px`);} }} className={`item-card group select-none border shadow-lg hover:-translate-y-0.5 transition transform ${justPopped?'animate-pop':''} ${isDark?'bg-slate-800/80 border-white/10':'bg-white/90 border-slate-200'} ${isDragging?'opacity-50':''}`}>
       {open && (
         <div className={`absolute top-9 right-1 z-[80] rounded-xl border p-2 w-48 overflow-hidden ${isDark?'bg-slate-900 border-white/10 text-white':'bg-white border-slate-200 text-slate-900'} shadow-2xl`} onClick={e=> e.stopPropagation()}>
           <div className="flex items-center gap-2 mb-2">
@@ -579,11 +548,11 @@ function FitText({ text, maxFont=20, minFont=10, maxLines=2 }){
   const ref = useRef(null);
   useEffect(()=>{
     const el = ref.current;
-    if(!el) return; // guard 1
+    if(!el) return; // guard
     let alive = true;
     let size = maxFont; let iter = 0;
     const apply = () => {
-      if(!alive || !el) return; // guard 2
+      if(!alive || !el) return;
       try {
         el.style.fontSize = size+'px';
         el.style.display='-webkit-box';
@@ -612,24 +581,20 @@ function FitText({ text, maxFont=20, minFont=10, maxLines=2 }){
 
 function Sparkle({x,y,angle,dist}){ const dx=Math.cos(angle)*dist; const dy=Math.sin(angle)*dist; return <div className="sparkle" style={{left:x, top:y, "--dx":`${dx}px`, "--dy":`${dy}px`}}/>; }
 
-// BlobButton now supports variant, disabled, loading
-function BlobButton({children,onClick,disabled=false,loading=false,variant='primary',title}){
-  const bg = variant==='danger'
-    ? 'linear-gradient(180deg,#fb7185,#ef4444)'
-    : 'linear-gradient(180deg,#93c5fd,#38bdf8)';
+/** 로딩/비활성 지원 버튼 */
+function BlobButton({children,onClick,disabled,loading}){
   return (
     <button
       onClick={onClick}
       disabled={disabled}
-      title={title}
-      className={`relative inline-flex items-center justify-center px-4 py-2 rounded-2xl font-semibold text-slate-900 shadow-lg active:scale-[0.98] transition select-none ${disabled?'opacity-60 cursor-not-allowed':''}`}
-      style={{background:bg, filter:'url(#goo)'}}
+      className={`relative inline-flex items-center justify-center px-4 py-2 rounded-2xl font-semibold text-slate-900 shadow-lg active:scale-[0.98] transition select-none ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
+      style={{background:'linear-gradient(180deg,#93c5fd,#38bdf8)', filter:'url(#goo)'}}
     >
       <span className="relative z-10 flex items-center gap-2">
         {loading && (
           <svg className="spin" width="16" height="16" viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="9" stroke="white" strokeWidth="3" opacity="0.25"/>
-            <path d="M21 12a9 9 0 0 1-9 9" stroke="white" strokeWidth="3" strokeLinecap="round"/>
+            <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" opacity="0.2"/>
+            <path d="M21 12a9 9 0 0 1-9 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
           </svg>
         )}
         {children}
@@ -640,6 +605,20 @@ function BlobButton({children,onClick,disabled=false,loading=false,variant='prim
         <span className="absolute w-7 h-7 bg-white/40 rounded-full left-3 bottom-3 animate-[bubble_2.2s_.1s_ease-in-out_infinite]"/>
       </span>
     </button>
+  );
+}
+
+function Modal({children,onClose,isDark}){
+  // 클릭 버블링 막고, 배경 클릭으로 닫기
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div
+        onClick={e=> e.stopPropagation()}
+        className={`w-full max-w-sm mx-auto rounded-2xl p-5 shadow-2xl ${isDark?'bg-slate-900/95 border border-white/10 text-white':'bg-white/95 border border-slate-200 text-slate-900'}`}
+      >
+        {children}
+      </div>
+    </div>
   );
 }
 
