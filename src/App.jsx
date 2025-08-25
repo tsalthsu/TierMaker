@@ -1,20 +1,27 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 /* @vite-ignore */
-// Arknights Tier – Clean (Save 5: 불러오기 로딩/중복클릭 방지 + 기본 아이템 제거)
-// - 기본 items 초기값 비움
-// - 6성 불러오기 중 로딩 애니메이션 + 버튼 비활성화
-// - 중복 클릭 방지 (로딩 중 재진입 차단)
-// - 기존 Save4의 행 기반 인덱싱 유지
+// Arknights Tier – Clean (Save 4 + Reset confirm + Ops6 double-click guard)
+// - Row-based insert index (multiline precise reordering)
+// - Ghost preview & sticky hover
+// - FitText race guards
+// - NEW: Reset confirmation (red button)
+// - NEW: 6★ fetch loading state + double-click guard (“이미 추가되어 있습니다”)
 
 export default function TierListApp() {
   const [theme, setTheme] = useState(() => localStorage.getItem('clean-tier-theme') || 'light');
   useEffect(() => { localStorage.setItem('clean-tier-theme', theme); }, [theme]);
   const isDark = theme === 'dark';
 
-  // 기본 아이템 제거
-  const [items, setItems] = useState(() => []);
-  const [pool, setPool] = useState(() => []);
-
+  // === core states ===
+  const [items, setItems] = useState(() => [
+    { id: uid(), label: "SilverAsh", image: "" },
+    { id: uid(), label: "Ch'en", image: "" },
+    { id: uid(), label: "Surtr", image: "" },
+    { id: uid(), label: "Thorns", image: "" },
+    { id: uid(), label: "Eyjafjalla", image: "" },
+    { id: uid(), label: "Kal'tsit", image: "" },
+  ]);
+  const [pool, setPool] = useState(() => items.map(i=>i.id));
   const [tiers, setTiers] = useState(() => [
     { name: 'S', color: '#60a5fa', items: [] },
     { name: 'A', color: '#34d399', items: [] },
@@ -22,6 +29,11 @@ export default function TierListApp() {
     { name: 'C', color: '#f97316', items: [] },
     { name: 'D', color: '#ef4444', items: [] },
   ]);
+
+  // NEW: UI guards for ops6 + reset
+  const [ops6Added, setOps6Added] = useState(false);
+  const [loadingOps, setLoadingOps] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
 
   const [dragData, setDragData] = useState(null);
   const [justPoppedId, setJustPoppedId] = useState(null);
@@ -33,14 +45,14 @@ export default function TierListApp() {
   const cachedRectsRef = useRef({}); // { [tierIndex]: Rect[] }
   const rafRef = useRef(null);
   const pendingPosRef = useRef(null);
-  const lastPosRef = useRef(null); // track latest committed x,y
+  const lastPosRef = useRef(null);
 
-  // 티어 메뉴/호버 상태
+  // Tier menu / hover states
   const [openTierMenu, setOpenTierMenu] = useState(null);
   const [hoverTierIndex, setHoverTierIndex] = useState(null);
   const [hoverInsertIndex, setHoverInsertIndex] = useState(null);
 
-  // 전역 드래그 종료 핸들러
+  // global end handler
   const endRef = useRef(()=>{});
   useEffect(()=>{ endRef.current = onDragEnd; });
   useEffect(()=>{ const handler=()=> endRef.current();
@@ -53,7 +65,7 @@ export default function TierListApp() {
     return ()=>{ window.removeEventListener('dragend', handler); window.removeEventListener('drop', handler); window.removeEventListener('dragcancel', handler); window.removeEventListener('pointerup', handler); window.removeEventListener('blur', handler); document.removeEventListener('mouseleave', handler); };
   },[]);
 
-  // 티어 메뉴 닫기
+  // close tier menu by outside / ESC
   useEffect(() => {
     const onDoc = () => setOpenTierMenu(null);
     const onKey = (e) => { if (e.key === 'Escape') setOpenTierMenu(null); };
@@ -65,7 +77,7 @@ export default function TierListApp() {
     };
   }, []);
 
-  // global dragover(좌표 유지)
+  // keep pointer position while dragging
   useEffect(()=>{
     function onGlobalDragOver(e){
       lastPosRef.current = { x: e.clientX, y: e.clientY };
@@ -82,7 +94,7 @@ export default function TierListApp() {
     return ()=> window.removeEventListener('dragover', onGlobalDragOver);
   },[]);
 
-  // 붙여넣기 이미지 지원
+  // paste image support
   useEffect(()=>{
     function onPaste(e){ const items=e.clipboardData?.items; if(!items) return; const files=[]; for(const it of items){ if(it.kind==='file'){ const f=it.getAsFile(); if(f && f.type.startsWith('image/')) files.push(f); } } if(files.length){ e.preventDefault(); addFilesAsItems(files);} }
     window.addEventListener('paste',onPaste); return ()=> window.removeEventListener('paste',onPaste);
@@ -90,17 +102,19 @@ export default function TierListApp() {
 
   const itemById = useMemo(()=> Object.fromEntries(items.map(i=>[i.id,i])), [items]);
 
-  // 간단 테스트
+  // smoke tests
   useEffect(() => {
     try {
       console.assert(Array.isArray(tiers) && tiers.length >= 1, 'tiers initialized');
+      console.assert(pool.length === items.length, 'pool equals items length initially');
       console.assert(clamp(5,0,3)===3 && clamp(-1,0,3)===0, 'clamp bounds');
       const a=[1,3]; const b=insertAt(a,1,2); console.assert(JSON.stringify(b)==='[1,2,3]' && a.length===2, 'insertAt');
-      console.assert(typeof uid()==='string' && uid().length>=6, 'uid ok');
-      console.assert(computeInsertIndex(null,0,0)===0, 'insertIndex null safe');
+      console.assert(typeof uid()==='string' && uid().length>=6, 'uid looks ok');
+      console.assert(computeInsertIndex(null,0,0)===0, 'insertIndex safe on null container');
     } catch {}
   }, []);
 
+  // DnD
   function onDragStart(e,payload){
     e.dataTransfer.setData('text/plain', JSON.stringify(payload));
     e.dataTransfer.effectAllowed='move';
@@ -145,86 +159,89 @@ export default function TierListApp() {
     return cards.map(el=>{
       const r=el.getBoundingClientRect();
       const id = el.dataset.id;
-      return {id, cx:r.left+r.width/2, cy:r.top+r.height/2, left:r.left, right:r.right, top:r.top, bottom:r.bottom, w:r.width};
+      return {
+        id,
+        cx: r.left + r.width/2,
+        cy: r.top + r.height/2,
+        left: r.left,
+        right: r.right,
+        top: r.top,
+        bottom: r.bottom,
+        w: r.width,
+        h: r.height, // for row grouping
+      };
     });
   }
 
-  // ------- 핵심: 행(row) 기반 삽입 인덱스 (수정판) -------
-function computeInsertIndex(container, x, y, excludeId){
-  if(!container) return 0;
-  const tierIndex = Number(container?.dataset?.tierIndex ?? -1);
-  let rects = cachedRectsRef.current[tierIndex];
-  if(!rects){ rects = getCardRects(container); cachedRectsRef.current[tierIndex]=rects; }
-  if(!rects.length) return 0;
+  // ------- 핵심: 행(row) 기반 삽입 인덱스 (정밀판) -------
+  function computeInsertIndex(container, x, y, excludeId){
+    if(!container) return 0;
+    const tierIndex = Number(container?.dataset?.tierIndex ?? -1);
+    let rects = cachedRectsRef.current[tierIndex];
+    if(!rects){ rects = getCardRects(container); cachedRectsRef.current[tierIndex]=rects; }
+    if(!rects.length) return 0;
 
-  // 같은 티어에서 끄는 카드 제외
-  let list = excludeId ? rects.filter(r=> r.id !== excludeId) : rects.slice();
-  if(!list.length) return 0;
+    // 같은 티어에서 끄는 카드 제외
+    let list = excludeId ? rects.filter(r=> r.id !== excludeId) : rects.slice();
+    if(!list.length) return 0;
 
-  // 1) top → left로 정렬
-  list.sort((a,b)=> (a.top===b.top ? a.left-b.left : a.top-b.top));
+    // 1) top → left 정렬
+    list.sort((a,b)=> (a.top===b.top ? a.left-b.left : a.top-b.top));
 
-  // 2) "같은 행" 묶기: 기준은 같은 행의 top 평균과의 차이
-  //    (이전 버전처럼 last.bottom 기준이 아니라 refTop(평균 top) 기준으로 묶어야 함)
-  const avgH = list.reduce((s, r) => s + (r.h || 0), 0) / list.length || 100;
-  const rowThresh = Math.max(avgH * 0.35, 28); // 같은 행으로 볼 y 허용 오차
+    // 2) 행 묶기
+    const avgH = list.reduce((s, r) => s + (r.h || 0), 0) / list.length || 100;
+    const rowThresh = Math.max(avgH * 0.35, 28);
 
-  const rows = [];
-  let refTop = null;
-  for(const r of list){
-    if(rows.length===0){
-      rows.push({ items:[r], refTop: r.top, top:r.top, bottom:r.bottom });
-      refTop = r.top;
-      continue;
+    const rows = [];
+    for(const r of list){
+      if(rows.length===0){
+        rows.push({ items:[r], refTop:r.top, top:r.top, bottom:r.bottom });
+        continue;
+      }
+      const cur = rows[rows.length-1];
+      const sameRow = Math.abs(r.top - cur.refTop) <= rowThresh;
+      if(sameRow){
+        cur.items.push(r);
+        cur.refTop = (cur.refTop * (cur.items.length-1) + r.top) / cur.items.length;
+        cur.top = Math.min(cur.top, r.top);
+        cur.bottom = Math.max(cur.bottom, r.bottom);
+      }else{
+        rows.push({ items:[r], refTop:r.top, top:r.top, bottom:r.bottom });
+      }
     }
-    const cur = rows[rows.length-1];
-    // 현재 행의 refTop(평균 top)과 비교해서 같은 행인지 판단
-    const sameRow = Math.abs(r.top - cur.refTop) <= rowThresh;
-    if(sameRow){
-      cur.items.push(r);
-      // refTop 갱신(부드럽게 평균)
-      cur.refTop = (cur.refTop * (cur.items.length-1) + r.top) / cur.items.length;
-      cur.top = Math.min(cur.top, r.top);
-      cur.bottom = Math.max(cur.bottom, r.bottom);
-    }else{
-      rows.push({ items:[r], refTop: r.top, top:r.top, bottom:r.bottom });
+    rows.forEach(row=> row.items.sort((a,b)=> a.left-b.left));
+
+    // 3) 포인터 y에 가장 가까운 행
+    let targetRowIndex = 0, bestDist = Infinity;
+    for(let i=0;i<rows.length;i++){
+      const row = rows[i];
+      const cy = (row.top + row.bottom) / 2;
+      const d = Math.abs(y - cy);
+      if(d < bestDist){ bestDist = d; targetRowIndex = i; }
     }
-  }
-  // 각 행 내부는 좌→우 정렬 보장
-  rows.forEach(row=> row.items.sort((a,b)=> a.left-b.left));
+    const targetRow = rows[targetRowIndex];
 
-  // 3) 포인터 y에 가장 가까운 행 선택(살짝 벗어나도 가장 가까운 행)
-  let targetRowIndex = 0;
-  let bestDist = Infinity;
-  for(let i=0;i<rows.length;i++){
-    const row = rows[i];
-    const cy = (row.top + row.bottom) / 2;
-    const d = Math.abs(y - cy);
-    if(d < bestDist){ bestDist = d; targetRowIndex = i; }
-  }
-  const targetRow = rows[targetRowIndex];
+    // 4) 선택된 행에서 x 기준 삽입
+    let within = targetRow.items.length;
+    for(let i=0;i<targetRow.items.length;i++){
+      if(x < targetRow.items[i].cx){ within = i; break; }
+    }
 
-  // 4) 선택된 행에서 x 기준으로 끼워넣을 위치 계산
-  let within = targetRow.items.length;
-  for(let i=0;i<targetRow.items.length;i++){
-    if(x < targetRow.items[i].cx){ within = i; break; }
+    // 5) 절대 인덱스
+    const before = rows.slice(0, targetRowIndex).reduce((s,row)=> s + row.items.length, 0);
+    const absIndex = before + within;
+    return clamp(absIndex, 0, list.length);
   }
 
-  // 5) 앞선 행들의 아이템 수 + within = 절대 인덱스
-  const before = rows.slice(0, targetRowIndex).reduce((s,row)=> s + row.items.length, 0);
-  const absIndex = before + within;
-  return clamp(absIndex, 0, list.length);
-}
-
-  // helper: 포인터가 해당 티어 안에 있는지
   const isPointInsideTier = (tierIdx, margin=12) => {
     const p = lastPosRef.current; const el = tierContainerRefs.current[tierIdx];
     if(!p || !el) return false; const r = el.getBoundingClientRect();
     return p.x >= r.left - margin && p.x <= r.right + margin && p.y >= r.top - margin && p.y <= r.bottom + margin;
-  }
+  };
 
   function triggerSparkles(x,y){ const id=uid(); const N=12; const arr=Array.from({length:N}).map((_,i)=>({ id:`${id}-${i}`, x,y, createdAt:Date.now(), angle:(Math.PI*2*i)/N + (Math.random()*0.4-0.2), dist:40+Math.random()*30 })); setSparkles(prev=>[...prev,...arr]); }
 
+  // tier edits
   const [editingTierIndex,setEditingTierIndex]=useState(null);
   const [editingTierValue,setEditingTierValue]=useState('');
   function startEditTier(i){ setEditingTierIndex(i); setEditingTierValue(tiers[i].name); }
@@ -233,19 +250,19 @@ function computeInsertIndex(container, x, y, excludeId){
   function removeTier(idx){ setTiers(prev=>{ const copy=prev.map(t=>({...t,items:[...t.items]})); const back=copy[idx].items; const next=copy.filter((_,i)=> i!==idx); setPool(p=>[...p,...back]); return next; }); }
   function setTierColor(idx,color){ setTiers(prev=> prev.map((t,i)=> i===idx? {...t,color} : t)); }
 
+  // add items
   const [newLabel,setNewLabel]=useState('');
   const [newImgUrl,setNewImgUrl]=useState('');
   function onSelectFiles(e){ const files=[...(e.target.files||[])]; if(files.length) addFilesAsItems(files); e.target.value=''; }
   function addFilesAsItems(files){ const readers=files.map(file=> new Promise(res=>{ const r=new FileReader(); r.onload=()=> res({name:file.name.replace(/\.[^.]+$/, ''), dataUrl:r.result}); r.readAsDataURL(file); })); Promise.all(readers).then(list=>{ const created=list.map(({name,dataUrl})=> ({id:uid(), label:name, image:dataUrl})); setItems(prev=>[...prev,...created]); setPool(prev=>[...prev,...created.map(c=>c.id)]); }); }
   function addNewItem(label,image){ const id=uid(); const item={id, label:label||'새 아이템', image:image||newImgUrl||''}; setItems(p=>[...p,item]); setPool(p=>[...p,id]); setNewLabel(''); setNewImgUrl(''); }
 
-  // ---- 6성 불러오기: /api/ops6 ----
-  const [loadingOps, setLoadingOps] = useState(false);
-
+  // ---- 6성 불러오기: /api/ops6 (with loading + double-click guard) ----
   async function loadSixFromOps() {
-    if (loadingOps) return;              // 연속 클릭 방지
-    setLoadingOps(true);
     try {
+      if (ops6Added) { alert('이미 6★ 목록이 추가되어 있습니다.'); return; }
+      setLoadingOps(true);
+
       const r = await fetch('/api/ops6', { headers: { 'Accept': 'application/json' } });
       if (!r.ok) throw new Error('불러오기 실패');
       const raw = await r.json();
@@ -260,6 +277,7 @@ function computeInsertIndex(container, x, y, excludeId){
 
       if (!arr.length) {
         alert('가져올 항목이 없습니다. (/api/ops6 응답 확인)');
+        setLoadingOps(false);
         return;
       }
 
@@ -286,6 +304,8 @@ function computeInsertIndex(container, x, y, excludeId){
 
       if (!dedup.length) {
         alert('새로 추가할 항목이 없습니다.');
+        // 그래도 “불러오기 실행”은 했으므로 재클릭 방지 위해 플래그 세우지 않음
+        setLoadingOps(false);
         return;
       }
 
@@ -296,8 +316,7 @@ function computeInsertIndex(container, x, y, excludeId){
       }));
       setItems((p) => [...p, ...created]);
       setPool((p) => [...p, ...created.map((c) => c.id)]);
-
-      // 완료 토스트
+      setOps6Added(true); // 이후 재클릭 시 경고
       alert(`6★ ${created.length}개 추가됨`);
     } catch (e) {
       console.error(e);
@@ -305,6 +324,14 @@ function computeInsertIndex(container, x, y, excludeId){
     } finally {
       setLoadingOps(false);
     }
+  }
+
+  // reset with confirmation; also allow re-import after real reset
+  function doReset() {
+    setPool(items.map(i=>i.id));
+    setTiers(prev=> prev.map(t=>({...t,items:[]})));
+    setOps6Added(false);
+    setConfirmReset(false);
   }
 
   return (
@@ -321,9 +348,28 @@ function computeInsertIndex(container, x, y, excludeId){
           </div>
           <div className="flex items-center gap-2 md:gap-3">
             <BlobButton onClick={addTier}>티어 추가</BlobButton>
-            <BlobButton onClick={()=> { setPool(items.map(i=>i.id)); setTiers(prev=> prev.map(t=>({...t,items:[]}))); }}>초기화</BlobButton>
-            <BlobButton onClick={loadSixFromOps} disabled={loadingOps} loading={loadingOps}>
-              {loadingOps ? '불러오는 중…' : '6성 불러오기'}
+
+            {!confirmReset ? (
+              <BlobButton onClick={()=> setConfirmReset(true)}>초기화</BlobButton>
+            ) : (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={()=> setConfirmReset(false)}
+                  className={`px-3 py-2 rounded-2xl border ${isDark?'bg-white/10 border-white/10 text-white':'bg-white border-slate-200 text-slate-900'} shadow-sm`}
+                >
+                  취소
+                </button>
+                <BlobButton variant="danger" onClick={doReset}>정말 초기화</BlobButton>
+              </div>
+            )}
+
+            <BlobButton
+              onClick={loadSixFromOps}
+              disabled={loadingOps || ops6Added}
+              loading={loadingOps}
+              title={ops6Added ? '이미 불러왔습니다' : '6성 불러오기'}
+            >
+              {ops6Added ? '이미 불러옴' : (loadingOps ? '불러오는 중…' : '6성 불러오기')}
             </BlobButton>
           </div>
         </div>
@@ -376,8 +422,8 @@ function computeInsertIndex(container, x, y, excludeId){
                         <label className="flex items-center justify-between text-sm mb-2">색 변경
                           <input type="color" value={tier.color} onChange={e=> setTierColor(idx, e.target.value)} className="w-6 h-6 border-0 p-0 bg-transparent cursor-pointer" />
                         </label>
-                        <button onClick={()=> startEditTier(idx)} className="w-full text-left text-sm px-2 py-1 rounded-lg hover:bg-black/5">이름 변경</button>
-                        <button onClick={()=> { removeTier(idx); setOpenTierMenu(null); }} className="w-full text-left text-sm px-2 py-1 rounded-lg hover:bg黑/5 text-rose-500">티어 삭제</button>
+                        <button onClick={()=> startEditTier(idx)} className="w-full text-left text-sm px-2 py-1 rounded-lg hover:bg:black/5">이름 변경</button>
+                        <button onClick={()=> { removeTier(idx); setOpenTierMenu(null); }} className="w-full text-left text-sm px-2 py-1 rounded-lg hover:bg-black/5 text-rose-500">티어 삭제</button>
                       </div>
                     )}
                   </div>
@@ -468,10 +514,9 @@ function computeInsertIndex(container, x, y, excludeId){
           background: transparent;
         }
         .ghost-card{opacity:.65; outline-offset:-2px;}
-
-        /* 버튼 로딩 스피너 */
+        /* loading spinner (button) */
         .spin { animation: spin 1s linear infinite; }
-        @keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }
+        @keyframes spin { from { transform: rotate(0deg);} to { transform: rotate(360deg);} }
       `}</style>
     </div>
   );
@@ -483,7 +528,19 @@ function DraggableItem({ item, onDragStart, justPopped, index, isDark, onRename,
   useEffect(()=>{ const onDoc=e=>{ if(ref.current && !ref.current.contains(e.target)) setOpen(false); }; const onKey=e=>{ if(e.key==='Escape') setOpen(false); }; document.addEventListener('click',onDoc); document.addEventListener('keydown',onKey); return ()=>{ document.removeEventListener('click',onDoc); document.removeEventListener('keydown',onKey); }; },[]);
 
   return (
-    <div ref={ref} data-role="card" data-id={item.id} onContextMenu={e=>{ e.preventDefault(); setOpen(true); }} draggable onDragStart={e=>{ onDragStart&&onDragStart(e); const r=ref.current?.getBoundingClientRect(); if(r){ e.currentTarget.style.setProperty('--mx', `${e.clientX-r.left}px`); e.currentTarget.style.setProperty('--my', `${e.clientY-r.top}px`);} }} className={`item-card group select-none border shadow-lg hover:-translate-y-0.5 transition transform ${justPopped?'animate-pop':''} ${isDark?'bg-slate-800/80 border-white/10':'bg-white/90 border-slate-200'} ${isDragging?'opacity-50':''}`}>
+    <div
+      ref={ref}
+      data-role="card"
+      data-id={item.id}
+      onContextMenu={e=>{ e.preventDefault(); setOpen(true); }}
+      draggable
+      onDragStart={e=>{
+        onDragStart&&onDragStart(e,{});
+        const r=ref.current?.getBoundingClientRect();
+        if(r){ e.currentTarget.style.setProperty('--mx', `${e.clientX-r.left}px`); e.currentTarget.style.setProperty('--my', `${e.clientY-r.top}px`); }
+      }}
+      className={`item-card group select-none border shadow-lg hover:-translate-y-0.5 transition transform ${justPopped?'animate-pop':''} ${isDark?'bg-slate-800/80 border-white/10':'bg-white/90 border-slate-200'} ${isDragging?'opacity-50':''}`}
+    >
       {open && (
         <div className={`absolute top-9 right-1 z-[80] rounded-xl border p-2 w-48 overflow-hidden ${isDark?'bg-slate-900 border-white/10 text-white':'bg-white border-slate-200 text-slate-900'} shadow-2xl`} onClick={e=> e.stopPropagation()}>
           <div className="flex items-center gap-2 mb-2">
@@ -498,7 +555,7 @@ function DraggableItem({ item, onDragStart, justPopped, index, isDark, onRename,
         {item.image
           ? <img src={item.image} alt={item.label} className="img-el" draggable={false}/>
           : <div className={`${isDark?'bg-slate-700/70 text-white/70':'bg-slate-100 text-slate-400'} w-full h-full flex items-center justify-center text-xs`}>IMG</div>}
-        </div>
+      </div>
       <div className={`item-name ${isDark? 'bg-slate-900/35 text-white':'bg-white/85 text-slate-900'}`}>
         <FitText text={item.label} maxFont={14} minFont={7}  maxLines={1} />
       </div>
@@ -522,11 +579,11 @@ function FitText({ text, maxFont=20, minFont=10, maxLines=2 }){
   const ref = useRef(null);
   useEffect(()=>{
     const el = ref.current;
-    if(!el) return; // guard
+    if(!el) return; // guard 1
     let alive = true;
     let size = maxFont; let iter = 0;
     const apply = () => {
-      if(!alive || !el) return;
+      if(!alive || !el) return; // guard 2
       try {
         el.style.fontSize = size+'px';
         el.style.display='-webkit-box';
@@ -555,21 +612,24 @@ function FitText({ text, maxFont=20, minFont=10, maxLines=2 }){
 
 function Sparkle({x,y,angle,dist}){ const dx=Math.cos(angle)*dist; const dy=Math.sin(angle)*dist; return <div className="sparkle" style={{left:x, top:y, "--dx":`${dx}px`, "--dy":`${dy}px`}}/>; }
 
-/** 로딩/비활성 지원 버튼 */
-function BlobButton({children,onClick,disabled,loading}){
+// BlobButton now supports variant, disabled, loading
+function BlobButton({children,onClick,disabled=false,loading=false,variant='primary',title}){
+  const bg = variant==='danger'
+    ? 'linear-gradient(180deg,#fb7185,#ef4444)'
+    : 'linear-gradient(180deg,#93c5fd,#38bdf8)';
   return (
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`relative inline-flex items-center justify-center px-4 py-2 rounded-2xl font-semibold text-slate-900 shadow-lg active:scale-[0.98] transition select-none
-        ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
-      style={{background:'linear-gradient(180deg,#93c5fd,#38bdf8)', filter:'url(#goo)'}}
+      title={title}
+      className={`relative inline-flex items-center justify-center px-4 py-2 rounded-2xl font-semibold text-slate-900 shadow-lg active:scale-[0.98] transition select-none ${disabled?'opacity-60 cursor-not-allowed':''}`}
+      style={{background:bg, filter:'url(#goo)'}}
     >
       <span className="relative z-10 flex items-center gap-2">
         {loading && (
           <svg className="spin" width="16" height="16" viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" opacity="0.2"/>
-            <path d="M21 12a9 9 0 0 1-9 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+            <circle cx="12" cy="12" r="9" stroke="white" strokeWidth="3" opacity="0.25"/>
+            <path d="M21 12a9 9 0 0 1-9 9" stroke="white" strokeWidth="3" strokeLinecap="round"/>
           </svg>
         )}
         {children}
