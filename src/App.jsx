@@ -1,15 +1,18 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 /* @vite-ignore */
-// Arknights Tier – Clean (Save 6.1: Fix tier-add crash + keep reset modal)
-// - Base: Save 6 (Reset Modal + Ops6 re-click warn)
-// - Fix: DraggableItem이 onDragStart에 payload를 재전달하지 않도록 수정(상위가 책임)
-// - Safe: tiers 변경 시 tierContainerRefs 길이 정리
-// - Keep: Save4 행 기반 삽입 인덱싱
+// Arknights Tier – Clean (Save 7: Name ON/OFF + Ops6 confirm modal + Reset copy)
+// - 이름 표시 토글(숨김 시 카드 정사각형)
+// - 6성 재클릭 시 모달 확인(중복 허용 강제 추가)
+// - 초기화 모달 문구/버튼 텍스트 조정
+// - Save6 기반 + Save4 행 인덱싱 유지
 
 export default function TierListApp() {
   const [theme, setTheme] = useState(() => localStorage.getItem('clean-tier-theme') || 'light');
   useEffect(() => { localStorage.setItem('clean-tier-theme', theme); }, [theme]);
   const isDark = theme === 'dark';
+
+  // 이름 ON/OFF
+  const [showNames, setShowNames] = useState(true);
 
   // 기본 아이템 제거 (빈 상태 시작)
   const [items, setItems] = useState(() => []);
@@ -49,9 +52,10 @@ export default function TierListApp() {
   // 초기화 모달
   const [showResetModal, setShowResetModal] = useState(false);
 
-  // ops6 재클릭 경고 플래그 + 로딩
+  // ops6 재클릭 경고 모달 + 로딩
   const [ops6Added, setOps6Added] = useState(false);
   const [loadingOps, setLoadingOps] = useState(false);
+  const [showOpsAgainModal, setShowOpsAgainModal] = useState(false);
 
   // 전역 드래그 종료 핸들러
   const endRef = useRef(()=>{});
@@ -69,7 +73,13 @@ export default function TierListApp() {
   // 티어 메뉴 닫기 + ESC로 모달 닫기
   useEffect(() => {
     const onDoc = () => setOpenTierMenu(null);
-    const onKey = (e) => { if (e.key === 'Escape') { setOpenTierMenu(null); setShowResetModal(false); } };
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        setOpenTierMenu(null);
+        setShowResetModal(false);
+        setShowOpsAgainModal(false);
+      }
+    };
     document.addEventListener('click', onDoc);
     document.addEventListener('keydown', onKey);
     return () => {
@@ -180,6 +190,9 @@ export default function TierListApp() {
     if(!list.length) return 0;
 
     // 1) top -> left 정렬
+    list.sort((a,b)=> (a.top===b.top ? a.left-b.left : a.top-b.left || a.top-b.top));
+
+    // 위 비교식 보정
     list.sort((a,b)=> (a.top===b.top ? a.left-b.left : a.top-b.top));
 
     // 2) 행 묶기 (평균 top 기반)
@@ -250,10 +263,12 @@ export default function TierListApp() {
   function addFilesAsItems(files){ const readers=files.map(file=> new Promise(res=>{ const r=new FileReader(); r.onload=()=> res({name:file.name.replace(/\.[^.]+$/, ''), dataUrl:r.result}); r.readAsDataURL(file); })); Promise.all(readers).then(list=>{ const created=list.map(({name,dataUrl})=> ({id:uid(), label:name, image:dataUrl})); setItems(prev=>[...prev,...created]); setPool(prev=>[...prev,...created.map(c=>c.id)]); }); }
   function addNewItem(label,image){ const id=uid(); const item={id, label:label||'새 아이템', image:image||newImgUrl||''}; setItems(p=>[...p,item]); setPool(p=>[...p,id]); setNewLabel(''); setNewImgUrl(''); }
 
-  // ---- 6성 불러오기: /api/ops6 (로딩+중복 실행 방지 + 재클릭 경고) ----
-  async function loadSixFromOps() {
+  // ---- 6성 불러오기: /api/ops6 (로딩+중복 실행 방지 + 재클릭 모달) ----
+  async function loadSixFromOps(forceAdd=false) {
     if (loadingOps) return; // 연속 클릭 방지
-    if (ops6Added) { alert('이미 추가되어 있습니다. 초기화 후 다시 시도하세요.'); return; }
+
+    // 이미 한 번 추가했고 강제가 아니면 모달 열기
+    if (!forceAdd && ops6Added) { setShowOpsAgainModal(true); return; }
 
     setLoadingOps(true);
     try {
@@ -282,29 +297,40 @@ export default function TierListApp() {
         })
         .filter(Boolean);
 
-      const existing = new Set(items.map((it) => it.label));
-      const dedup = [];
-      const seen = new Set();
-      for (const it of normalized) {
-        if (existing.has(it.label)) continue;
-        if (seen.has(it.label)) continue;
-        seen.add(it.label);
-        dedup.push(it);
+      // 중복 처리: forceAdd=true면 기존과 중복 허용(이번 응답내 동일 라벨만 제거)
+      let createdSrc = [];
+      if (forceAdd) {
+        const seen = new Set();
+        for (const it of normalized) {
+          if (seen.has(it.label)) continue;
+          seen.add(it.label);
+          createdSrc.push(it);
+        }
+      } else {
+        const existing = new Set(items.map((it) => it.label));
+        const seen = new Set();
+        for (const it of normalized) {
+          if (existing.has(it.label)) continue;
+          if (seen.has(it.label)) continue;
+          seen.add(it.label);
+          createdSrc.push(it);
+        }
       }
 
-      if (!dedup.length) { alert('새로 추가할 항목이 없습니다.'); return; }
+      if (!createdSrc.length) { alert('새로 추가할 항목이 없습니다.'); return; }
 
-      const created = dedup.map(({ label, image }) => ({ id: uid(), label, image }));
+      const created = createdSrc.map(({ label, image }) => ({ id: uid(), label, image }));
       setItems((p) => [...p, ...created]);
       setPool((p) => [...p, ...created.map((c) => c.id)]);
 
-      setOps6Added(true); // 재클릭 시 경고
+      setOps6Added(true);
       alert(`6★ ${created.length}개 추가됨`);
     } catch (e) {
       console.error(e);
       alert('불러오기에 실패했습니다. (/api/ops6 확인)');
     } finally {
       setLoadingOps(false);
+      setShowOpsAgainModal(false);
     }
   }
 
@@ -326,7 +352,7 @@ export default function TierListApp() {
       {showResetModal && (
         <Modal onClose={()=> setShowResetModal(false)} isDark={isDark}>
           <div className="text-center space-y-4">
-            <h3 className="text-lg font-bold">정말 초기화할까요?</h3>
+            <h3 className="text-lg font-bold">초기 상태로 되돌립니다</h3>
             <p className="text-sm opacity-80">모든 티어 배치를 비우고 풀로 되돌립니다.</p>
             <div className="flex justify-center gap-3 pt-2">
               <button
@@ -337,7 +363,28 @@ export default function TierListApp() {
                 onClick={doReset}
                 className="px-4 py-2 rounded-xl text-white shadow-lg"
                 style={{background:'linear-gradient(180deg,#fb7185,#ef4444)'}}
-              >정말 초기화</button>
+              >초기화</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Ops6 재추가 모달 */}
+      {showOpsAgainModal && (
+        <Modal onClose={()=> setShowOpsAgainModal(false)} isDark={isDark}>
+          <div className="text-center space-y-4">
+            <h3 className="text-lg font-bold">이미 추가되어 있습니다</h3>
+            <p className="text-sm opacity-80">더 추가하겠습니까?</p>
+            <div className="flex justify-center gap-3 pt-2">
+              <button
+                onClick={()=> setShowOpsAgainModal(false)}
+                className={`px-4 py-2 rounded-xl border ${isDark?'bg-white/10 border-white/10':'bg-white border-slate-200'}`}
+              >취소</button>
+              <button
+                onClick={()=> loadSixFromOps(true)}
+                className="px-4 py-2 rounded-xl text-white shadow-lg"
+                style={{background:'linear-gradient(180deg,#60a5fa,#38bdf8)'}}
+              >추가</button>
             </div>
           </div>
         </Modal>
@@ -352,9 +399,17 @@ export default function TierListApp() {
           <div className="flex items-center gap-2 md:gap-3">
             <BlobButton onClick={addTier}>티어 추가</BlobButton>
             <BlobButton onClick={()=> setShowResetModal(true)}>초기화</BlobButton>
-            <BlobButton onClick={loadSixFromOps} disabled={loadingOps} loading={loadingOps}>
+            <BlobButton onClick={()=> loadSixFromOps(false)} disabled={loadingOps} loading={loadingOps}>
               {loadingOps ? '불러오는 중…' : '6성 불러오기'}
             </BlobButton>
+            <button
+              type="button"
+              onClick={()=> setShowNames(v=>!v)}
+              className={`px-3 py-2 rounded-xl border text-sm ${isDark?'bg-white/10 border-white/10 text-white':'bg-white border-slate-200 text-slate-900'}`}
+              title="카드 이름 표시 토글"
+            >
+              {showNames ? '이름 숨기기' : '이름 표시'}
+            </button>
           </div>
         </div>
       </header>
@@ -391,6 +446,7 @@ export default function TierListApp() {
                 index={index}
                 isDark={isDark}
                 isDragging={dragData?.id===id}
+                showNames={showNames}
                 onRename={newName=> setItems(prev=> prev.map(it=> it.id===id? {...it,label:newName}: it))}
                 onDelete={()=>{ setItems(prev=> prev.filter(it=> it.id!==id)); setPool(prev=> prev.filter(x=> x!==id)); }}
               />
@@ -471,7 +527,7 @@ export default function TierListApp() {
                     const ghostAt = (dragData && hoverTierIndex===idx && isPointInsideTier(idx) && hoverInsertIndex!=null) ? Math.min(hoverInsertIndex, filtered.length) : null;
                     const out = [];
                     for(let i=0;i<filtered.length;i++){
-                      if(ghostAt===i && dragData && itemById[dragData.id]) out.push(<GhostPreview key="__ghost" item={itemById[dragData.id]} isDark={isDark} />);
+                      if(ghostAt===i && dragData && itemById[dragData.id]) out.push(<GhostPreview key="__ghost" item={itemById[dragData.id]} isDark={isDark} showNames={showNames} />);
                       const id = filtered[i];
                       out.push(
                         <DraggableItem
@@ -482,12 +538,13 @@ export default function TierListApp() {
                           justPopped={justPoppedId===id}
                           isDark={isDark}
                           isDragging={dragData?.id===id}
+                          showNames={showNames}
                           onRename={newName=> setItems(prev=> prev.map(it=> it.id===id? {...it,label:newName}: it))}
                           onDelete={()=>{ setItems(prev=> prev.filter(it=> it.id!==id)); setTiers(prev=> prev.map((t,i2)=> i2===idx? {...t,items:t.items.filter(x=> x!==id)}: t)); }}
                         />
                       );
                     }
-                    if(ghostAt===filtered.length && dragData && itemById[dragData.id]) out.push(<GhostPreview key="__ghost" item={itemById[dragData.id]} isDark={isDark} />);
+                    if(ghostAt===filtered.length && dragData && itemById[dragData.id]) out.push(<GhostPreview key="__ghost" item={itemById[dragData.id]} isDark={isDark} showNames={showNames} />);
                     return out;
                   })()}
                 </div>
@@ -498,8 +555,10 @@ export default function TierListApp() {
       </main>
 
       <style>{`
-        .item-card { position: relative; width: 78px; height: 115px; border-radius: 12px; display: flex; flex-direction: column; overflow: visible; }
+        .item-card { position: relative; width: var(--w,78px); height: var(--h,115px); border-radius: 12px; display: flex; flex-direction: column; overflow: visible; }
+        .item-card.square { --h: var(--w,78px); } /* 이름 숨김 시 정사각형 */
         .item-img { width: 100%; height: 78px; overflow: hidden; border-top-left-radius: 12px; border-top-right-radius: 12px; }
+        .item-card.square .item-img { height: 100%; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; } /* 전체가 이미지 */
         .item-card .img-el { width: 100%; height: 100%; object-fit: cover; }
         .item-name { height: 32px; display: grid; place-items: center; padding: 2px 4px 0px; font-weight: 800; text-align: center; line-height: 1.05; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; backdrop-filter: saturate(120%) blur(2px); overflow: hidden; }
         .item-card:after { content: ""; position: absolute; inset: -1px; border-radius: 18px; pointer-events: none; opacity: 0; transition: opacity .2s ease; background: radial-gradient(120px 80px at var(--mx,50%) var(--my,50%), rgba(255,255,255,.15), transparent 50%); }
@@ -530,10 +589,12 @@ export default function TierListApp() {
   );
 }
 
-function DraggableItem({ item, onDragStart, justPopped, index, isDark, onRename, onDelete, isDragging }){
+function DraggableItem({ item, onDragStart, justPopped, index, isDark, onRename, onDelete, isDragging, showNames }){
   const ref = useRef(null);
   const [open,setOpen] = useState(false);
   useEffect(()=>{ const onDoc=e=>{ if(ref.current && !ref.current.contains(e.target)) setOpen(false); }; const onKey=e=>{ if(e.key==='Escape') setOpen(false); }; document.addEventListener('click',onDoc); document.addEventListener('keydown',onKey); return ()=>{ document.removeEventListener('click',onDoc); document.removeEventListener('keydown',onKey); }; },[]);
+
+  const square = !showNames;
 
   return (
     <div
@@ -543,7 +604,7 @@ function DraggableItem({ item, onDragStart, justPopped, index, isDark, onRename,
       onContextMenu={e=>{ e.preventDefault(); setOpen(true); }}
       draggable
       onDragStart={e=>{ onDragStart && onDragStart(e); const r=ref.current?.getBoundingClientRect(); if(r){ e.currentTarget.style.setProperty('--mx', `${e.clientX-r.left}px`); e.currentTarget.style.setProperty('--my', `${e.clientY-r.top}px`);} }}
-      className={`item-card group select-none border shadow-lg hover:-translate-y-0.5 transition transform ${justPopped?'animate-pop':''} ${isDark?'bg-slate-800/80 border-white/10':'bg-white/90 border-slate-200'} ${isDragging?'opacity-50':''}`}
+      className={`item-card ${square?'square':''} group select-none border shadow-lg hover:-translate-y-0.5 transition transform ${justPopped?'animate-pop':''} ${isDark?'bg-slate-800/80 border-white/10':'bg-white/90 border-slate-200'} ${isDragging?'opacity-50':''}`}
     >
       {open && (
         <div className={`absolute top-9 right-1 z-[80] rounded-xl border p-2 w-48 overflow-hidden ${isDark?'bg-slate-900 border-white/10 text-white':'bg-white border-slate-200 text-slate-900'} shadow-2xl`} onClick={e=> e.stopPropagation()}>
@@ -560,21 +621,30 @@ function DraggableItem({ item, onDragStart, justPopped, index, isDark, onRename,
           ? <img src={item.image} alt={item.label} className="img-el" draggable={false}/>
           : <div className={`${isDark?'bg-slate-700/70 text-white/70':'bg-slate-100 text-slate-400'} w-full h-full flex items-center justify-center text-xs`}>IMG</div>}
       </div>
-      <div className={`item-name ${isDark? 'bg-slate-900/35 text-white':'bg-white/85 text-slate-900'}`}>
-        <FitText text={item.label} maxFont={14} minFont={7}  maxLines={1} />
-      </div>
+
+      {showNames && (
+        <div className={`item-name ${isDark? 'bg-slate-900/35 text-white':'bg-white/85 text-slate-900'}`}>
+          <FitText text={item.label} maxFont={14} minFont={7}  maxLines={1} />
+        </div>
+      )}
     </div>
   );
 }
 
-function GhostPreview({item,isDark}){
+function GhostPreview({item,isDark,showNames}){
   if(!item) return null;
+  const square = !showNames;
   return (
-    <div className={`item-card ghost-card border-2 ${isDark?'bg-slate-800/50 border-white/20':'bg-white/60 border-slate-300/60'}`} data-role="card-ghost">
-      <div className="item-img" style={{opacity:.6}}>{item.image? <img src={item.image} alt="ghost" className="img-el"/> : <div className={`${isDark?'bg-slate-700/60 text-white/50':'bg-slate-100 text-slate-400'} w-full h-full flex items-center justify-center text-xs`}>IMG</div>}</div>
-      <div className={`item-name ${isDark? 'bg-slate-900/25 text-white/80':'bg-white/70 text-slate-800'}`} style={{opacity:.9}}>
-        <FitText text={item.label} maxFont={14} minFont={7}  maxLines={1} />
+    <div className={`item-card ${square?'square':''} ghost-card border-2 ${isDark?'bg-slate-800/50 border-white/20':'bg-white/60 border-slate-300/60'}`} data-role="card-ghost">
+      <div className="item-img" style={{opacity:.6}}>
+        {item.image ? <img src={item.image} alt="ghost" className="img-el"/> :
+          <div className={`${isDark?'bg-slate-700/60 text-white/50':'bg-slate-100 text-slate-400'} w-full h-full flex items-center justify-center text-xs`}>IMG</div>}
       </div>
+      {showNames && (
+        <div className={`item-name ${isDark? 'bg-slate-900/25 text-white/80':'bg-white/70 text-slate-800'}`} style={{opacity:.9}}>
+          <FitText text={item.label} maxFont={14} minFont={7}  maxLines={1} />
+        </div>
+      )}
     </div>
   );
 }
