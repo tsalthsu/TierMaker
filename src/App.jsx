@@ -879,12 +879,30 @@ function ThemeToggle({isDark,onToggle,position="br"}){
 /** Hover-animated language picker */
 function LangPicker({lang,setLang,langs,flags,names,isDark,open,setOpen,label}){
   const ref = useRef(null);
+  const timeoutRef = useRef(null);
+
+  const handleMouseEnter = () => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+    setOpen(true);
+  };
+
+  const handleMouseLeave = () => {
+    // 0.6초 뒤에 닫기 (0.5~1초 원하는 값으로 조절 가능)
+    timeoutRef.current = setTimeout(() => {
+      setOpen(false);
+      timeoutRef.current = null;
+    }, 600);
+  };
+
   return (
     <div
       ref={ref}
       className="relative"
-      onMouseEnter={()=> setOpen(true)}
-      onMouseLeave={()=> setOpen(false)}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
       {/* anchor / compact button */}
       <button
@@ -915,6 +933,7 @@ function LangPicker({lang,setLang,langs,flags,names,isDark,open,setOpen,label}){
     </div>
   );
 }
+
 
 function Modal({children,onClose,isDark}){
   return (
