@@ -890,11 +890,11 @@ function LangPicker({lang,setLang,langs,flags,names,isDark,open,setOpen,label}){
   };
 
   const handleMouseLeave = () => {
-    // 0.6초 뒤에 닫기 (0.5~1초 원하는 값으로 조절 가능)
+    // 0.3초 뒤에 닫기 (0.5~1초 원하는 값으로 조절 가능)
     timeoutRef.current = setTimeout(() => {
       setOpen(false);
       timeoutRef.current = null;
-    }, 600);
+    }, 300);
   };
 
   return (
