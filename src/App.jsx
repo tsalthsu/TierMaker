@@ -1,9 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 /* @vite-ignore */
-// Arknights Tier – Clean (Save 9: Ops6 Loading Overlay + Lang hover delay tune)
-// - Add: 6★ load overlay (modal style) to match app UI
-// - Tune: language picker close delay -> 100ms
-// - Keep: Save8 features (i18n, theme bottom-left, reset & re-add modals, DnD, name on/off)
+// Arknights Tier – Clean (Save 9: Toast + Lang delay 0.1s)
+// - Theme toggle bottom-left
+// - i18n auto-detect + manual switch (en/ko/ja/zh) for UI & item names
+// - Hover-animated language picker next to Name toggle (close delay 0.1s)
+// - Reset modal, Ops6 re-add confirm modal
+// - Row-based DnD, Name on/off (square cards when hidden)
+// - Replaced alerts with top-right Toasts (success/warn/error)
 
 export default function TierListApp() {
   // ---------- Theme ----------
@@ -48,12 +51,10 @@ export default function TierListApp() {
       nameShow: 'Show Names',
       nameHide: 'Hide Names',
       langTitle: 'Language',
-      opsLoadTitle: 'Loading 6★ operators',
-      opsLoadDesc: 'Fetching latest operators…',
-      opsNone: 'No entries from /api/ops6',
-      opsFail: 'Load failed (/api/ops6)',
-      opsDoneCount: (n)=>`6★ ${n}`,
-      nothingToAdd: 'Nothing to add.',
+      toastOpsSuccess: 'Loaded {n} 6★.',
+      toastOpsNoEntries: 'No entries from /api/ops6.',
+      toastOpsNoneToAdd: 'Nothing to add.',
+      toastOpsFail: 'Load failed (/api/ops6).',
     },
     ko: {
       title: 'Arknights Tier – Clean',
@@ -75,12 +76,10 @@ export default function TierListApp() {
       nameShow: '이름 표시',
       nameHide: '이름 숨기기',
       langTitle: '언어',
-      opsLoadTitle: '6성 데이터를 불러오는 중',
-      opsLoadDesc: '최신 오퍼레이터 목록을 가져오는 중…',
-      opsNone: '/api/ops6 응답에 항목이 없습니다',
-      opsFail: '불러오기에 실패했습니다 (/api/ops6)',
-      opsDoneCount: (n)=>`6★ ${n}`,
-      nothingToAdd: '추가할 항목이 없습니다.',
+      toastOpsSuccess: '6★ {n}개 불러왔습니다.',
+      toastOpsNoEntries: '/api/ops6 에 항목이 없습니다.',
+      toastOpsNoneToAdd: '추가할 항목이 없습니다.',
+      toastOpsFail: '불러오기에 실패했습니다 (/api/ops6).',
     },
     ja: {
       title: 'Arknights Tier – Clean',
@@ -93,7 +92,7 @@ export default function TierListApp() {
       addSingle: '1件追加',
       dragHere: 'ここにドラッグして配置します。',
       confirmResetTitle: '初期状態に戻します',
-      confirmResetDesc: '全ティアをクリアしてプールに戻します。',
+      confirmResetDesc: '全てのティアをクリアし、プールに戻します。',
       cancel: 'キャンセル',
       resetGo: 'リセット',
       opsAgainTitle: '既に追加されています',
@@ -102,12 +101,10 @@ export default function TierListApp() {
       nameShow: '名前表示',
       nameHide: '名前非表示',
       langTitle: '言語',
-      opsLoadTitle: '★6オペレーターを読み込み中',
-      opsLoadDesc: '最新のオペレーターを取得しています…',
-      opsNone: '/api/ops6 に項目がありません',
-      opsFail: '読み込みに失敗しました (/api/ops6)',
-      opsDoneCount: (n)=>`★6 ${n}`,
-      nothingToAdd: '追加する項目がありません。',
+      toastOpsSuccess: '★6を{n}件読み込みました。',
+      toastOpsNoEntries: '/api/ops6 に項目がありません。',
+      toastOpsNoneToAdd: '追加する項目はありません。',
+      toastOpsFail: '読み込みに失敗しました（/api/ops6）。',
     },
     zh: {
       title: 'Arknights Tier – Clean',
@@ -129,18 +126,22 @@ export default function TierListApp() {
       nameShow: '显示名称',
       nameHide: '隐藏名称',
       langTitle: '语言',
-      opsLoadTitle: '正在加载 6★ 干员',
-      opsLoadDesc: '正在获取最新干员列表…',
-      opsNone: '/api/ops6 返回为空',
-      opsFail: '加载失败 (/api/ops6)',
-      opsDoneCount: (n)=>`6★ ${n}`,
-      nothingToAdd: '没有可添加的项。',
+      toastOpsSuccess: '已导入 {n} 个6★。',
+      toastOpsNoEntries: '/api/ops6 没有返回项目。',
+      toastOpsNoneToAdd: '没有可添加的项目。',
+      toastOpsFail: '导入失败（/api/ops6）。',
     }
   };
-  const t = (k,...args)=> {
-    const v = (MSG[lang] && MSG[lang][k]) ?? MSG.en[k] ?? k;
-    return typeof v === 'function' ? v(...args) : v;
-  };
+  const t = (k)=> (MSG[lang] && MSG[lang][k]) || MSG.en[k] || k;
+  const tfmt = (k, vars={}) => (t(k) || '').replace(/\{(\w+)\}/g, (_,m)=> String(vars[m] ?? ''));
+
+  // ---------- Toasts ----------
+  const [toasts, setToasts] = useState([]); // {id, msg, type}
+  function pushToast(msg, type='info', duration=2500){
+    const id = uid();
+    setToasts(prev => [...prev, { id, msg, type }]);
+    setTimeout(()=> setToasts(prev => prev.filter(t=> t.id!==id)), duration);
+  }
 
   // ---------- Name ON/OFF ----------
   const [showNames, setShowNames] = useState(true);
@@ -397,7 +398,7 @@ export default function TierListApp() {
   }
   const displayName = (item)=> (item?.nameMap?.[lang] || item?.nameMap?.en || item?.label || '');
 
-  // ---- Load 6★ (/api/ops6) with confirm modal for re-add + overlay ----
+  // ---- Load 6★ (/api/ops6) with confirm modal for re-add & Toasts ----
   async function loadSixFromOps(forceAdd=false) {
     if (loadingOps) return;
 
@@ -417,7 +418,7 @@ export default function TierListApp() {
         ? raw.result
         : [];
 
-      if (!arr.length) { alert(t('opsNone')); return; }
+      if (!arr.length) { pushToast(t('toastOpsNoEntries'), 'warn'); return; }
 
       const norm = arr.map((x)=>{
         if (x == null) return null;
@@ -456,16 +457,16 @@ export default function TierListApp() {
         }
       }
 
-      if (!createFrom.length) { alert(t('nothingToAdd')); return; }
+      if (!createFrom.length) { pushToast(t('toastOpsNoneToAdd'), 'warn'); return; }
 
       setItems((p)=> [...p, ...createFrom]);
       setPool((p)=> [...p, ...createFrom.map(c=>c.id)]);
 
       setOps6Added(true);
-      alert(t('opsDoneCount', createFrom.length));
+      pushToast(tfmt('toastOpsSuccess', { n: createFrom.length }), 'success');
     } catch (e) {
       console.error(e);
-      alert(t('opsFail'));
+      pushToast(t('toastOpsFail'), 'error');
     } finally {
       setLoadingOps(false);
       setShowOpsAgainModal(false);
@@ -488,14 +489,12 @@ export default function TierListApp() {
       {/* Theme toggle moved to bottom-left */}
       <ThemeToggle isDark={isDark} onToggle={()=> setTheme(isDark?'light':'dark')} position="bl" />
 
-      {/* Loading overlay for ops6 */}
-      {loadingOps && (
-        <LoadingOverlay
-          isDark={isDark}
-          title={t('opsLoadTitle')}
-          desc={t('opsLoadDesc')}
-        />
-      )}
+      {/* Toast container (top-right) */}
+      <div className="fixed top-4 right-4 z-[70] space-y-2">
+        {toasts.map(ti => (
+          <Toast key={ti.id} msg={ti.msg} type={ti.type} isDark={isDark} />
+        ))}
+      </div>
 
       {/* Reset modal */}
       {showResetModal && (
@@ -562,7 +561,7 @@ export default function TierListApp() {
               {showNames ? t('nameHide') : t('nameShow')}
             </button>
 
-            {/* Language selector (hover-expand) */}
+            {/* Language selector (hover-expand, 0.1s close delay) */}
             <LangPicker
               lang={lang}
               setLang={setLang}
@@ -573,6 +572,7 @@ export default function TierListApp() {
               open={langOpen}
               setOpen={setLangOpen}
               label={t('langTitle')}
+              closeDelayMs={100}
             />
           </div>
         </div>
@@ -760,17 +760,11 @@ export default function TierListApp() {
         .lang-pop.open { transform: scale(1); opacity: 1; }
         .lang-pop.closed { transform: scale(.85); opacity: 0; pointer-events: none; }
 
-        /* loading dots */
-        .dots::after {
-          content: '…';
-          animation: dots 1.2s steps(4, end) infinite;
-        }
-        @keyframes dots {
-          0% { content: ''; }
-          33% { content: '.'; }
-          66% { content: '..'; }
-          100% { content: '...'; }
-        }
+        /* Toasts */
+        .toast { animation: toastIn .18s ease-out, toastOut .22s ease-in forwards; }
+        .toast[data-life="short"] { animation-delay: 0s, 2.3s; }
+        @keyframes toastIn { from { transform: translateY(-6px); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
+        @keyframes toastOut { to { transform: translateY(-6px); opacity: 0 } }
       `}</style>
     </div>
   );
@@ -875,6 +869,21 @@ function FitText({ text, maxFont=20, minFont=10, maxLines=2 }){
 
 function Sparkle({x,y,angle,dist}){ const dx=Math.cos(angle)*dist; const dy=Math.sin(angle)*dist; return <div className="sparkle" style={{left:x, top:y, "--dx":`${dx}px`, "--dy":`${dy}px`}}/>; }
 
+/** Toast bubble */
+function Toast({msg, type='info', isDark}){
+  const tone = type==='success' ? (isDark?'bg-emerald-500/15 text-emerald-200 border-emerald-400/30':'bg-emerald-50 text-emerald-800 border-emerald-300')
+             : type==='warn'    ? (isDark?'bg-amber-500/15 text-amber-200 border-amber-400/30':'bg-amber-50 text-amber-900 border-amber-300')
+             : type==='error'   ? (isDark?'bg-rose-500/15 text-rose-200 border-rose-400/30':'bg-rose-50 text-rose-900 border-rose-300')
+             :                    (isDark?'bg-white/10 text-white border-white/15':'bg-white text-slate-900 border-slate-200');
+  return (
+    <div className={`toast [animation-fill-mode:forwards]`} data-life="short">
+      <div className={`min-w-[220px] max-w-[60vw] px-3 py-2 rounded-xl border shadow-lg ${tone}`}>
+        <div className="text-sm">{msg}</div>
+      </div>
+    </div>
+  );
+}
+
 /** Button with optional spinner */
 function BlobButton({children,onClick,disabled,loading}){
   return (
@@ -922,8 +931,8 @@ function ThemeToggle({isDark,onToggle,position="br"}){
   );
 }
 
-/** Hover-animated language picker (with 100ms close delay) */
-function LangPicker({lang,setLang,langs,flags,names,isDark,open,setOpen,label}){
+/** Hover-animated language picker (closeDelay adjustable) */
+function LangPicker({lang,setLang,langs,flags,names,isDark,open,setOpen,label,closeDelayMs=100}){
   const ref = useRef(null);
   const timeoutRef = useRef(null);
 
@@ -939,7 +948,7 @@ function LangPicker({lang,setLang,langs,flags,names,isDark,open,setOpen,label}){
     timeoutRef.current = setTimeout(() => {
       setOpen(false);
       timeoutRef.current = null;
-    }, 100); // <- 0.1s delay
+    }, closeDelayMs);
   };
 
   return (
@@ -974,24 +983,6 @@ function LangPicker({lang,setLang,langs,flags,names,isDark,open,setOpen,label}){
             </button>
           ))}
         </div>
-      </div>
-    </div>
-  );
-}
-
-/** Centered loading overlay (modal look) */
-function LoadingOverlay({isDark, title, desc}){
-  return (
-    <div className="modal-backdrop">
-      <div className={`w-full max-w-sm mx-auto rounded-2xl p-6 shadow-2xl flex flex-col items-center text-center ${isDark?'bg-slate-900/95 border border-white/10 text-white':'bg-white/95 border border-slate-200 text-slate-900'}`}>
-        <div className="mb-3">
-          <svg className="spin" width="28" height="28" viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" opacity="0.2"/>
-            <path d="M21 12a9 9 0 0 1-9 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
-          </svg>
-        </div>
-        <h3 className="text-lg font-bold">{title}</h3>
-        <p className="text-sm opacity-80">{desc}</p>
       </div>
     </div>
   );
