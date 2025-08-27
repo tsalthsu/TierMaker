@@ -1,10 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 /* @vite-ignore */
-// Arknights Tier – Clean (Save 8: i18n + Lang Switcher + Theme btn relocate)
-// - Theme toggle bottom-left
-// - i18n auto-detect + manual switch (en/ko/ja/zh) for UI & item names
-// - Hover-animated language picker next to Name toggle
-// - Keeps Save7 features (reset modal, ops6 confirm, row-based DnD, name on/off)
+// Arknights Tier – Clean (Save 9: Ops6 Loading Overlay + Lang hover delay tune)
+// - Add: 6★ load overlay (modal style) to match app UI
+// - Tune: language picker close delay -> 100ms
+// - Keep: Save8 features (i18n, theme bottom-left, reset & re-add modals, DnD, name on/off)
 
 export default function TierListApp() {
   // ---------- Theme ----------
@@ -49,6 +48,12 @@ export default function TierListApp() {
       nameShow: 'Show Names',
       nameHide: 'Hide Names',
       langTitle: 'Language',
+      opsLoadTitle: 'Loading 6★ operators',
+      opsLoadDesc: 'Fetching latest operators…',
+      opsNone: 'No entries from /api/ops6',
+      opsFail: 'Load failed (/api/ops6)',
+      opsDoneCount: (n)=>`6★ ${n}`,
+      nothingToAdd: 'Nothing to add.',
     },
     ko: {
       title: 'Arknights Tier – Clean',
@@ -70,6 +75,12 @@ export default function TierListApp() {
       nameShow: '이름 표시',
       nameHide: '이름 숨기기',
       langTitle: '언어',
+      opsLoadTitle: '6성 데이터를 불러오는 중',
+      opsLoadDesc: '최신 오퍼레이터 목록을 가져오는 중…',
+      opsNone: '/api/ops6 응답에 항목이 없습니다',
+      opsFail: '불러오기에 실패했습니다 (/api/ops6)',
+      opsDoneCount: (n)=>`6★ ${n}`,
+      nothingToAdd: '추가할 항목이 없습니다.',
     },
     ja: {
       title: 'Arknights Tier – Clean',
@@ -82,7 +93,7 @@ export default function TierListApp() {
       addSingle: '1件追加',
       dragHere: 'ここにドラッグして配置します。',
       confirmResetTitle: '初期状態に戻します',
-      confirmResetDesc: '全てのティアをクリアし、プールに戻します。',
+      confirmResetDesc: '全ティアをクリアしてプールに戻します。',
       cancel: 'キャンセル',
       resetGo: 'リセット',
       opsAgainTitle: '既に追加されています',
@@ -91,6 +102,12 @@ export default function TierListApp() {
       nameShow: '名前表示',
       nameHide: '名前非表示',
       langTitle: '言語',
+      opsLoadTitle: '★6オペレーターを読み込み中',
+      opsLoadDesc: '最新のオペレーターを取得しています…',
+      opsNone: '/api/ops6 に項目がありません',
+      opsFail: '読み込みに失敗しました (/api/ops6)',
+      opsDoneCount: (n)=>`★6 ${n}`,
+      nothingToAdd: '追加する項目がありません。',
     },
     zh: {
       title: 'Arknights Tier – Clean',
@@ -112,9 +129,18 @@ export default function TierListApp() {
       nameShow: '显示名称',
       nameHide: '隐藏名称',
       langTitle: '语言',
+      opsLoadTitle: '正在加载 6★ 干员',
+      opsLoadDesc: '正在获取最新干员列表…',
+      opsNone: '/api/ops6 返回为空',
+      opsFail: '加载失败 (/api/ops6)',
+      opsDoneCount: (n)=>`6★ ${n}`,
+      nothingToAdd: '没有可添加的项。',
     }
   };
-  const t = (k)=> (MSG[lang] && MSG[lang][k]) || MSG.en[k] || k;
+  const t = (k,...args)=> {
+    const v = (MSG[lang] && MSG[lang][k]) ?? MSG.en[k] ?? k;
+    return typeof v === 'function' ? v(...args) : v;
+  };
 
   // ---------- Name ON/OFF ----------
   const [showNames, setShowNames] = useState(true);
@@ -371,7 +397,7 @@ export default function TierListApp() {
   }
   const displayName = (item)=> (item?.nameMap?.[lang] || item?.nameMap?.en || item?.label || '');
 
-  // ---- Load 6★ (/api/ops6) with confirm modal for re-add ----
+  // ---- Load 6★ (/api/ops6) with confirm modal for re-add + overlay ----
   async function loadSixFromOps(forceAdd=false) {
     if (loadingOps) return;
 
@@ -391,7 +417,7 @@ export default function TierListApp() {
         ? raw.result
         : [];
 
-      if (!arr.length) { alert('No entries from /api/ops6'); return; }
+      if (!arr.length) { alert(t('opsNone')); return; }
 
       const norm = arr.map((x)=>{
         if (x == null) return null;
@@ -430,16 +456,16 @@ export default function TierListApp() {
         }
       }
 
-      if (!createFrom.length) { alert('Nothing to add.'); return; }
+      if (!createFrom.length) { alert(t('nothingToAdd')); return; }
 
       setItems((p)=> [...p, ...createFrom]);
       setPool((p)=> [...p, ...createFrom.map(c=>c.id)]);
 
       setOps6Added(true);
-      alert(`6★ ${createFrom.length}`);
+      alert(t('opsDoneCount', createFrom.length));
     } catch (e) {
       console.error(e);
-      alert('Load failed (/api/ops6)');
+      alert(t('opsFail'));
     } finally {
       setLoadingOps(false);
       setShowOpsAgainModal(false);
@@ -461,6 +487,15 @@ export default function TierListApp() {
 
       {/* Theme toggle moved to bottom-left */}
       <ThemeToggle isDark={isDark} onToggle={()=> setTheme(isDark?'light':'dark')} position="bl" />
+
+      {/* Loading overlay for ops6 */}
+      {loadingOps && (
+        <LoadingOverlay
+          isDark={isDark}
+          title={t('opsLoadTitle')}
+          desc={t('opsLoadDesc')}
+        />
+      )}
 
       {/* Reset modal */}
       {showResetModal && (
@@ -578,7 +613,6 @@ export default function TierListApp() {
                 showNames={showNames}
                 name={displayName(itemById[id])}
                 onRename={newName=> {
-                  // update all langs to same newName when editing
                   setItems(prev=> prev.map(it=> it.id===id? {...it, label:newName, nameMap:{en:newName,ko:newName,ja:newName,zh:newName}}: it))
                 }}
                 onDelete={()=>{ setItems(prev=> prev.filter(it=> it.id!==id)); setPool(prev=> prev.filter(x=> x!==id)); }}
@@ -725,6 +759,18 @@ export default function TierListApp() {
         .lang-pop { transform-origin: top right; transition: transform .18s ease, opacity .18s ease; }
         .lang-pop.open { transform: scale(1); opacity: 1; }
         .lang-pop.closed { transform: scale(.85); opacity: 0; pointer-events: none; }
+
+        /* loading dots */
+        .dots::after {
+          content: '…';
+          animation: dots 1.2s steps(4, end) infinite;
+        }
+        @keyframes dots {
+          0% { content: ''; }
+          33% { content: '.'; }
+          66% { content: '..'; }
+          100% { content: '...'; }
+        }
       `}</style>
     </div>
   );
@@ -876,7 +922,7 @@ function ThemeToggle({isDark,onToggle,position="br"}){
   );
 }
 
-/** Hover-animated language picker */
+/** Hover-animated language picker (with 100ms close delay) */
 function LangPicker({lang,setLang,langs,flags,names,isDark,open,setOpen,label}){
   const ref = useRef(null);
   const timeoutRef = useRef(null);
@@ -890,11 +936,10 @@ function LangPicker({lang,setLang,langs,flags,names,isDark,open,setOpen,label}){
   };
 
   const handleMouseLeave = () => {
-    // 0.3초 뒤에 닫기 (0.5~1초 원하는 값으로 조절 가능)
     timeoutRef.current = setTimeout(() => {
       setOpen(false);
       timeoutRef.current = null;
-    }, 300);
+    }, 100); // <- 0.1s delay
   };
 
   return (
@@ -934,6 +979,23 @@ function LangPicker({lang,setLang,langs,flags,names,isDark,open,setOpen,label}){
   );
 }
 
+/** Centered loading overlay (modal look) */
+function LoadingOverlay({isDark, title, desc}){
+  return (
+    <div className="modal-backdrop">
+      <div className={`w-full max-w-sm mx-auto rounded-2xl p-6 shadow-2xl flex flex-col items-center text-center ${isDark?'bg-slate-900/95 border border-white/10 text-white':'bg-white/95 border border-slate-200 text-slate-900'}`}>
+        <div className="mb-3">
+          <svg className="spin" width="28" height="28" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" opacity="0.2"/>
+            <path d="M21 12a9 9 0 0 1-9 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+          </svg>
+        </div>
+        <h3 className="text-lg font-bold">{title}</h3>
+        <p className="text-sm opacity-80">{desc}</p>
+      </div>
+    </div>
+  );
+}
 
 function Modal({children,onClose,isDark}){
   return (
