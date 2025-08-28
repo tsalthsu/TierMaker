@@ -1,12 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 /* @vite-ignore */
-// Arknights Tier – Clean (Save 9: Toast + Lang delay 0.1s)
-// - Theme toggle bottom-left
-// - i18n auto-detect + manual switch (en/ko/ja/zh) for UI & item names
-// - Hover-animated language picker next to Name toggle (close delay 0.1s)
-// - Reset modal, Ops6 re-add confirm modal
-// - Row-based DnD, Name on/off (square cards when hidden)
-// - Replaced alerts with top-right Toasts (success/warn/error)
+// Arknights Tier – Clean (Save 10: Multi-load 4/5/6/All + confirm modals)
+// - Header: 4★/5★/6★/All buttons (in that order)
+// - Each shows a confirm modal before loading
+// - Fetch tries /api/ops?star=X then falls back to /api/opsX
+// - i18n, theme bottom-left, name on/off, toast, row-based DnD maintained
 
 export default function TierListApp() {
   // ---------- Theme ----------
@@ -35,7 +33,10 @@ export default function TierListApp() {
       title: 'Arknights Tier – Clean',
       addTier: 'Add Tier',
       reset: 'Reset',
+      load4: 'Load 4★',
+      load5: 'Load 5★',
       load6: 'Load 6★',
+      loadAll: 'Load All',
       loading: 'Loading…',
       inputLabel: 'Label (optional)',
       inputImg: 'Image URL (optional)',
@@ -45,22 +46,31 @@ export default function TierListApp() {
       confirmResetDesc: 'This clears all tiers and returns items to the pool.',
       cancel: 'Cancel',
       resetGo: 'Reset',
-      opsAgainTitle: 'Already added',
-      opsAgainDesc: 'Add more anyway?',
-      opsAdd: 'Add',
+      // generic confirm
+      confirmLoadTitle: 'Load {star}',
+      confirmLoadDesc: 'Do you want to import {star} operators?',
+      confirmYes: 'Load',
+      // toasts
+      toastOpsSuccess: 'Loaded {n} {star}.',
+      toastOpsNoEntries: 'No entries from the API.',
+      toastOpsNoneToAdd: 'Nothing to add.',
+      toastOpsFail: 'Load failed.',
       nameShow: 'Show Names',
       nameHide: 'Hide Names',
       langTitle: 'Language',
-      toastOpsSuccess: 'Loaded {n} 6★.',
-      toastOpsNoEntries: 'No entries from /api/ops6.',
-      toastOpsNoneToAdd: 'Nothing to add.',
-      toastOpsFail: 'Load failed (/api/ops6).',
+      star4: '4★',
+      star5: '5★',
+      star6: '6★',
+      starAll: 'All',
     },
     ko: {
       title: 'Arknights Tier – Clean',
       addTier: '티어 추가',
       reset: '초기화',
+      load4: '4성 불러오기',
+      load5: '5성 불러오기',
       load6: '6성 불러오기',
+      loadAll: '전체 불러오기',
       loading: '불러오는 중…',
       inputLabel: '라벨 (선택)',
       inputImg: '이미지 URL (선택)',
@@ -70,22 +80,31 @@ export default function TierListApp() {
       confirmResetDesc: '모든 티어 배치를 비우고 풀로 되돌립니다.',
       cancel: '취소',
       resetGo: '초기화',
-      opsAgainTitle: '이미 추가되어 있습니다',
-      opsAgainDesc: '더 추가하겠습니까?',
-      opsAdd: '추가',
+      // generic confirm
+      confirmLoadTitle: '{star} 불러오기',
+      confirmLoadDesc: '{star} 오퍼레이터를 불러오겠습니까?',
+      confirmYes: '불러오기',
+      // toasts
+      toastOpsSuccess: '{star} {n}개 불러왔습니다.',
+      toastOpsNoEntries: 'API에서 불러올 항목이 없습니다.',
+      toastOpsNoneToAdd: '추가할 항목이 없습니다.',
+      toastOpsFail: '불러오기에 실패했습니다.',
       nameShow: '이름 표시',
       nameHide: '이름 숨기기',
       langTitle: '언어',
-      toastOpsSuccess: '6★ {n}개 불러왔습니다.',
-      toastOpsNoEntries: '/api/ops6 에 항목이 없습니다.',
-      toastOpsNoneToAdd: '추가할 항목이 없습니다.',
-      toastOpsFail: '불러오기에 실패했습니다 (/api/ops6).',
+      star4: '4성',
+      star5: '5성',
+      star6: '6성',
+      starAll: '전체',
     },
     ja: {
       title: 'Arknights Tier – Clean',
       addTier: 'ティア追加',
       reset: 'リセット',
+      load4: '★4を読み込む',
+      load5: '★5を読み込む',
       load6: '★6を読み込む',
+      loadAll: '全て読み込む',
       loading: '読み込み中…',
       inputLabel: 'ラベル（任意）',
       inputImg: '画像URL（任意）',
@@ -95,22 +114,29 @@ export default function TierListApp() {
       confirmResetDesc: '全てのティアをクリアし、プールに戻します。',
       cancel: 'キャンセル',
       resetGo: 'リセット',
-      opsAgainTitle: '既に追加されています',
-      opsAgainDesc: 'さらに追加しますか？',
-      opsAdd: '追加',
+      confirmLoadTitle: '{star}の読み込み',
+      confirmLoadDesc: '{star}オペレーターを読み込みますか？',
+      confirmYes: '読み込む',
+      toastOpsSuccess: '{star}を{n}件読み込みました。',
+      toastOpsNoEntries: 'APIから読み込む項目がありません。',
+      toastOpsNoneToAdd: '追加する項目はありません。',
+      toastOpsFail: '読み込みに失敗しました。',
       nameShow: '名前表示',
       nameHide: '名前非表示',
       langTitle: '言語',
-      toastOpsSuccess: '★6を{n}件読み込みました。',
-      toastOpsNoEntries: '/api/ops6 に項目がありません。',
-      toastOpsNoneToAdd: '追加する項目はありません。',
-      toastOpsFail: '読み込みに失敗しました（/api/ops6）。',
+      star4: '★4',
+      star5: '★5',
+      star6: '★6',
+      starAll: '全て',
     },
     zh: {
       title: 'Arknights Tier – Clean',
       addTier: '添加层级',
       reset: '重置',
+      load4: '导入4★',
+      load5: '导入5★',
       load6: '导入6★',
+      loadAll: '全部导入',
       loading: '加载中…',
       inputLabel: '标签（可选）',
       inputImg: '图片URL（可选）',
@@ -120,16 +146,20 @@ export default function TierListApp() {
       confirmResetDesc: '清空所有层级并将项目放回池中。',
       cancel: '取消',
       resetGo: '重置',
-      opsAgainTitle: '已添加',
-      opsAgainDesc: '仍要继续添加吗？',
-      opsAdd: '添加',
+      confirmLoadTitle: '导入{star}',
+      confirmLoadDesc: '要导入{star}干员吗？',
+      confirmYes: '导入',
+      toastOpsSuccess: '已导入 {n} 个{star}。',
+      toastOpsNoEntries: 'API 未返回可导入的项目。',
+      toastOpsNoneToAdd: '没有可添加的项目。',
+      toastOpsFail: '导入失败。',
       nameShow: '显示名称',
       nameHide: '隐藏名称',
       langTitle: '语言',
-      toastOpsSuccess: '已导入 {n} 个6★。',
-      toastOpsNoEntries: '/api/ops6 没有返回项目。',
-      toastOpsNoneToAdd: '没有可添加的项目。',
-      toastOpsFail: '导入失败（/api/ops6）。',
+      star4: '4★',
+      star5: '5★',
+      star6: '6★',
+      starAll: '全部',
     }
   };
   const t = (k)=> (MSG[lang] && MSG[lang][k]) || MSG.en[k] || k;
@@ -184,10 +214,9 @@ export default function TierListApp() {
   // reset modal
   const [showResetModal, setShowResetModal] = useState(false);
 
-  // ops6 again modal + loading
-  const [ops6Added, setOps6Added] = useState(false);
+  // load confirm modal
+  const [confirmTarget, setConfirmTarget] = useState(null); // '4'|'5'|'6'|'all'|null
   const [loadingOps, setLoadingOps] = useState(false);
-  const [showOpsAgainModal, setShowOpsAgainModal] = useState(false);
 
   // language picker hover state
   const [langOpen, setLangOpen] = useState(false);
@@ -212,7 +241,7 @@ export default function TierListApp() {
       if (e.key === 'Escape') {
         setOpenTierMenu(null);
         setShowResetModal(false);
-        setShowOpsAgainModal(false);
+        setConfirmTarget(null);
         setLangOpen(false);
       }
     };
@@ -398,17 +427,32 @@ export default function TierListApp() {
   }
   const displayName = (item)=> (item?.nameMap?.[lang] || item?.nameMap?.en || item?.label || '');
 
-  // ---- Load 6★ (/api/ops6) with confirm modal for re-add & Toasts ----
-  async function loadSixFromOps(forceAdd=false) {
+  // ---- Unified Loader (4/5/6/All) ----
+  async function loadFromOps(star) {
     if (loadingOps) return;
-
-    if (!forceAdd && ops6Added) { setShowOpsAgainModal(true); return; }
-
     setLoadingOps(true);
+    const starLabel = star==='all' ? t('starAll') : (star==='4'?t('star4'):star==='5'?t('star5'):t('star6'));
+
     try {
-      const r = await fetch('/api/ops6', { headers: { 'Accept': 'application/json' } });
-      if (!r.ok) throw new Error('fetch fail');
-      const raw = await r.json();
+      // try query endpoint first, then fallback to /api/opsX
+      const tryEndpoints = [];
+      if (star === 'all') {
+        tryEndpoints.push('/api/ops?star=all', '/api/opsAll');
+      } else {
+        tryEndpoints.push(`/api/ops?star=${star}`, `/api/ops${star}`);
+      }
+
+      let raw = null, ok = false;
+      for (const url of tryEndpoints) {
+        try {
+          const r = await fetch(url, { headers: { 'Accept': 'application/json' } });
+          if (!r.ok) continue;
+          raw = await r.json();
+          ok = true;
+          break;
+        } catch {}
+      }
+      if (!ok) throw new Error('fetch fail');
 
       const arr = Array.isArray(raw)
         ? raw
@@ -441,20 +485,15 @@ export default function TierListApp() {
         return makeItem({ label: map.en || any, image: img, nameMap: map });
       }).filter(Boolean);
 
-      // de-dup logic
-      let createFrom = [];
-      if (forceAdd) {
-        const seen = new Set();
-        for (const it of norm) { const k = (it.nameMap?.en || it.label); if (seen.has(k)) continue; seen.add(k); createFrom.push(it); }
-      } else {
-        const existing = new Set(items.map((it)=> it.nameMap?.en || it.label));
-        const seen = new Set();
-        for (const it of norm) {
-          const k = (it.nameMap?.en || it.label);
-          if (existing.has(k)) continue;
-          if (seen.has(k)) continue;
-          seen.add(k); createFrom.push(it);
-        }
+      // de-dup against existing
+      const existing = new Set(items.map((it)=> it.nameMap?.en || it.label));
+      const seen = new Set();
+      const createFrom = [];
+      for (const it of norm) {
+        const k = (it.nameMap?.en || it.label);
+        if (existing.has(k)) continue;
+        if (seen.has(k)) continue;
+        seen.add(k); createFrom.push(it);
       }
 
       if (!createFrom.length) { pushToast(t('toastOpsNoneToAdd'), 'warn'); return; }
@@ -462,14 +501,13 @@ export default function TierListApp() {
       setItems((p)=> [...p, ...createFrom]);
       setPool((p)=> [...p, ...createFrom.map(c=>c.id)]);
 
-      setOps6Added(true);
-      pushToast(tfmt('toastOpsSuccess', { n: createFrom.length }), 'success');
+      pushToast(tfmt('toastOpsSuccess', { n: createFrom.length, star: starLabel }), 'success');
     } catch (e) {
       console.error(e);
       pushToast(t('toastOpsFail'), 'error');
     } finally {
       setLoadingOps(false);
-      setShowOpsAgainModal(false);
+      setConfirmTarget(null);
     }
   }
 
@@ -477,7 +515,7 @@ export default function TierListApp() {
   function doReset() {
     setPool(items.map(i=>i.id));
     setTiers(prev=> prev.map(t=>({...t,items:[]})));
-    setOps6Added(false);
+    setConfirmTarget(null);
     setShowResetModal(false);
   }
 
@@ -517,22 +555,29 @@ export default function TierListApp() {
         </Modal>
       )}
 
-      {/* Ops6 re-add modal */}
-      {showOpsAgainModal && (
-        <Modal onClose={()=> setShowOpsAgainModal(false)} isDark={isDark}>
+      {/* Generic load confirm modal */}
+      {confirmTarget && (
+        <Modal onClose={()=> setConfirmTarget(null)} isDark={isDark}>
           <div className="text-center space-y-4">
-            <h3 className="text-lg font-bold">{t('opsAgainTitle')}</h3>
-            <p className="text-sm opacity-80">{t('opsAgainDesc')}</p>
+            <h3 className="text-lg font-bold">
+              {tfmt('confirmLoadTitle', { star: confirmTarget==='all' ? t('starAll') : confirmTarget==='4'?t('star4'):confirmTarget==='5'?t('star5'):t('star6') })}
+            </h3>
+            <p className="text-sm opacity-80">
+              {tfmt('confirmLoadDesc', { star: confirmTarget==='all' ? t('starAll') : confirmTarget==='4'?t('star4'):confirmTarget==='5'?t('star5'):t('star6') })}
+            </p>
             <div className="flex justify-center gap-3 pt-2">
               <button
-                onClick={()=> setShowOpsAgainModal(false)}
+                onClick={()=> setConfirmTarget(null)}
                 className={`px-4 py-2 rounded-xl border ${isDark?'bg-white/10 border-white/10':'bg-white border-slate-200'}`}
               >{t('cancel')}</button>
               <button
-                onClick={()=> loadSixFromOps(true)}
-                className="px-4 py-2 rounded-xl text-white shadow-lg"
+                onClick={()=> loadFromOps(confirmTarget)}
+                className="px-4 py-2 rounded-xl text-white shadow-lg disabled:opacity-60"
+                disabled={loadingOps}
                 style={{background:'linear-gradient(180deg,#60a5fa,#38bdf8)'}}
-              >{t('opsAdd')}</button>
+              >
+                {loadingOps ? t('loading') : t('confirmYes')}
+              </button>
             </div>
           </div>
         </Modal>
@@ -547,8 +592,19 @@ export default function TierListApp() {
           <div className="flex items-center gap-2 md:gap-3">
             <BlobButton onClick={addTier}>{t('addTier')}</BlobButton>
             <BlobButton onClick={()=> setShowResetModal(true)}>{t('reset')}</BlobButton>
-            <BlobButton onClick={()=> loadSixFromOps(false)} disabled={loadingOps} loading={loadingOps}>
-              {loadingOps ? t('loading') : t('load6')}
+
+            {/* Load buttons: 4,5,6,All */}
+            <BlobButton onClick={()=> setConfirmTarget('4')} disabled={loadingOps}>
+              {t('load4')}
+            </BlobButton>
+            <BlobButton onClick={()=> setConfirmTarget('5')} disabled={loadingOps}>
+              {t('load5')}
+            </BlobButton>
+            <BlobButton onClick={()=> setConfirmTarget('6')} disabled={loadingOps}>
+              {t('load6')}
+            </BlobButton>
+            <BlobButton onClick={()=> setConfirmTarget('all')} disabled={loadingOps}>
+              {t('loadAll')}
             </BlobButton>
 
             {/* Name toggle */}
@@ -561,7 +617,7 @@ export default function TierListApp() {
               {showNames ? t('nameHide') : t('nameShow')}
             </button>
 
-            {/* Language selector (hover-expand, 0.1s close delay) */}
+            {/* Language selector (hover-expand, close delay 0.1s) */}
             <LangPicker
               lang={lang}
               setLang={setLang}
