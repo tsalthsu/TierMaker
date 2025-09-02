@@ -26,11 +26,34 @@ const SRC =
 const prtsIcon = (cnName) =>
   `https://prts.wiki/w/Special:FilePath/${encodeURIComponent('头像_' + cnName)}.png`;
 
-// 5성 판별: rarity가 4(0~5 스케일) 이거나 문자열에 '5' 포함
+// 5성 판별: rarity 4(0~5)
 const isFiveStar = (r) => {
-  if (typeof r === 'number') return r === 4; // 0~5 -> 1~6성
+  if (typeof r === 'number') return r === 4;
   if (typeof r === 'string') return r.toUpperCase().includes('5');
   return false;
+};
+
+// ===== 예외 캐릭터 필터 =====
+const EXCLUDE_SET = new Set([
+  'Mechanist',
+  'Misery',
+  'Outcast',
+  'Pith',
+  'Scout',
+  'Sharp',
+  'Stormeye',
+  'Touch',
+]);
+const isReserveOperator = (s) => /^Reserve Operator\s*-\s*/i.test(s || '');
+const isExcluded = (c) => {
+  const app = (c.appellation || '').trim();
+  const nm = (c.name || '').trim();
+  return (
+    EXCLUDE_SET.has(app) ||
+    EXCLUDE_SET.has(nm) ||
+    isReserveOperator(app) ||
+    isReserveOperator(nm)
+  );
 };
 
 export default async function handler() {
@@ -42,11 +65,11 @@ export default async function handler() {
     const list = [];
     for (const [key, c] of Object.entries(data || {})) {
       if (!c || typeof c !== 'object') continue;
-
       const prof = (c.profession || '').toUpperCase();
       if (prof === 'TOKEN') continue;
 
       if (!isFiveStar(c.rarity)) continue;
+      if (isExcluded(c)) continue; // ★ 예외 필터 적용
 
       const nameCN = c.name || c.appellation || key;
       const label =
