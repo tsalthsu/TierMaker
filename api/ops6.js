@@ -1,5 +1,5 @@
 // /api/ops6.js
-// 최신 6성 목록 + 아이콘 URL (PRTS Special:FilePath 이용)
+// 최신 6성 목록 + 아이콘 URL (PRTS Special:FilePath 이용 + Raiden 예외처리)
 
 export const config = { runtime: 'edge' };
 
@@ -23,13 +23,21 @@ function bad(status, msg) {
 const SRC =
   'https://raw.githubusercontent.com/Kengxxiao/ArknightsGameData/master/zh_CN/gamedata/excel/character_table.json';
 
-// PRTS 아이콘: 언어 무관 Special:FilePath로 원본 파일 경로 자동 리다이렉트
-const prtsIcon = (cnName) =>
-  `https://prts.wiki/w/Special:FilePath/${encodeURIComponent('头像_' + cnName)}.png`;
+// ----- 예외 아이콘 매핑 -----
+// key: CN name(중문), value: 직접 링크
+const ICON_OVERRIDES = {
+  '电弧': 'https://media.prts.wiki/5/56/%E5%A4%B4%E5%83%8F_%E7%94%B5%E5%BC%A7.png', // Raiden
+};
 
-// 6성 판별: rarity가 5(0~5 스케일) 이거나 'TIER_6'/'6' 같은 문자열 대비
+// PRTS 아이콘: 예외 있으면 우선, 없으면 Special:FilePath
+const prtsIcon = (cnName) => {
+  if (ICON_OVERRIDES[cnName]) return ICON_OVERRIDES[cnName];
+  return `https://prts.wiki/w/Special:FilePath/${encodeURIComponent('头像_' + cnName)}.png`;
+};
+
+// 6성 판별
 const isSixStar = (r) => {
-  if (typeof r === 'number') return r >= 5; // 0~5 -> 1~6성
+  if (typeof r === 'number') return r >= 5;
   if (typeof r === 'string') return r.toUpperCase().includes('6');
   return false;
 };
@@ -63,35 +71,30 @@ export default async function handler() {
     if (!res.ok) return bad(res.status, `HTTP ${res.status} on ${SRC}`);
     const data = await res.json();
 
-    // character_table.json은 { char_***: { ... }, ... } 형태의 오브젝트
     const list = [];
     for (const [key, c] of Object.entries(data || {})) {
       if (!c || typeof c !== 'object') continue;
-
-      // 토큰/소환물 등 제외
       const prof = (c.profession || '').toUpperCase();
       if (prof === 'TOKEN') continue;
 
       if (!isSixStar(c.rarity)) continue;
-      if (isExcluded(c)) continue; // ★ 예외 필터 적용
+      if (isExcluded(c)) continue;
 
-      const nameCN = c.name || c.appellation || key; // CN 이름이 항상 존재
+      const nameCN = c.name || c.appellation || key;
       const label =
         c.appellation && String(c.appellation).trim().length > 0
           ? c.appellation
           : nameCN;
 
       list.push({
-        id: key,                 // char_****
-        label,                   // 라벨: 영문 Appellation 우선
-        image: prtsIcon(nameCN), // PRTS Special:FilePath 경유 원본 아이콘
+        id: key,
+        label,
+        image: prtsIcon(nameCN),
       });
     }
 
-    // 이름순 정렬(보기 좋게)
     list.sort((a, b) => a.label.localeCompare(b.label, 'en'));
-
-    return ok(list, 3600); // 1시간 캐시
+    return ok(list, 3600);
   } catch (e) {
     return bad(500, 'ops6: ' + (e?.message || 'unknown error'));
   }
