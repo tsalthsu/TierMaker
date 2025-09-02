@@ -28,12 +28,35 @@ const prtsIcon = (cnName) =>
 
 // 4~6성 판별: rarity 3~5
 const isTarget = (r) => {
-  if (typeof r === 'number') return r >= 3 && r <= 5; // 4~6성
+  if (typeof r === 'number') return r >= 3 && r <= 5;
   if (typeof r === 'string') {
     const s = r.toUpperCase();
     return s.includes('4') || s.includes('5') || s.includes('6');
   }
   return false;
+};
+
+// ===== 예외 캐릭터 필터 =====
+const EXCLUDE_SET = new Set([
+  'Mechanist',
+  'Misery',
+  'Outcast',
+  'Pith',
+  'Scout',
+  'Sharp',
+  'Stormeye',
+  'Touch',
+]);
+const isReserveOperator = (s) => /^Reserve Operator\s*-\s*/i.test(s || '');
+const isExcluded = (c) => {
+  const app = (c.appellation || '').trim();
+  const nm = (c.name || '').trim();
+  return (
+    EXCLUDE_SET.has(app) ||
+    EXCLUDE_SET.has(nm) ||
+    isReserveOperator(app) ||
+    isReserveOperator(nm)
+  );
 };
 
 export default async function handler() {
@@ -45,11 +68,11 @@ export default async function handler() {
     const list = [];
     for (const [key, c] of Object.entries(data || {})) {
       if (!c || typeof c !== 'object') continue;
-
       const prof = (c.profession || '').toUpperCase();
       if (prof === 'TOKEN') continue;
 
       if (!isTarget(c.rarity)) continue;
+      if (isExcluded(c)) continue; // ★ 예외 필터 적용
 
       const nameCN = c.name || c.appellation || key;
       const label =
