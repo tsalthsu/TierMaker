@@ -9,3 +9,32 @@
 html, body, #root {
   height: 100%;
 }
+
+/* ===== Export-time overrides ===== */
+.exporting * {
+  animation: none !important;
+  transition: none !important;
+}
+
+.exporting [data-export-hide="true"] {
+  display: none !important;
+}
+
+/* sticky/fixed가 캡처를 찢어놓는 걸 방지 */
+.exporting header,
+.exporting [data-sticky="true"] {
+  position: static !important;
+  top: auto !important;
+}
+
+/* backdrop-blur 같은 필터는 dom 캡처 엔진에서 깨질 수 있음 */
+.exporting * {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  filter: none !important;
+}
+
+/* 컨테이너가 잘리는 걸 방지 (필요 시) */
+.exporting body, .exporting html {
+  overflow: visible !important;
+}
