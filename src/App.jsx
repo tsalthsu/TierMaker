@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import ExportPNG from "./components/ExportPNG";
 /* @vite-ignore */
 // Arknights Tier – Clean (Save 10: Multi-load 4/5/6/All + confirm modals)
 // - Header: 4★/5★/6★/All buttons (in that order)
@@ -583,7 +584,7 @@ export default function TierListApp() {
         </Modal>
       )}
 
-      <header className={`sticky top-0 z-30 backdrop-blur border-b ${isDark?'bg-slate-900/50 border-white/10':'bg-white/70 border-slate-200/70'}`}>
+      <header className={`sticky top-0 z-30 backdrop-blur border-b ${isDark?'bg-slate-900/50 border-white/10':'bg-white/70 border-slate-200/70'}`} data-export-hide="true">
         <div className="mx-auto max-w-[1400px] px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-2xl shadow-lg relative overflow-hidden" style={{filter:'url(#goo)', background:isDark?'#3b82f6':'#60a5fa'}}><BubbleDots/></div>
@@ -606,6 +607,9 @@ export default function TierListApp() {
             <BlobButton onClick={()=> setConfirmTarget('all')} disabled={loadingOps}>
               {t('loadAll')}
             </BlobButton>
+            {/* PNG Export */}
+            <ExportPNG targetId="tierboard" fileName="tierlist" scale={3} />
+
 
             {/* Name toggle */}
             <button
@@ -634,7 +638,7 @@ export default function TierListApp() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1400px] px-4 py-6">
+      <main id="tierboard" className="mx-auto max-w-[1400px] px-4 py-6">
         {/* Upload */}
         <section className="mb-6">
           <div
