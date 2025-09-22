@@ -92,7 +92,7 @@ export default async function handler() {
       list.push({
         id: key,
         label,
-        image: prtsIcon(nameCN),
+        image: '/api/img?url=' + encodeURIComponent(prtsIcon(nameCN)),
       });
     }
 
