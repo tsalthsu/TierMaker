@@ -80,7 +80,8 @@ export default async function handler() {
       list.push({
         id: key,
         label,
-        image: prtsIcon(nameCN),
+        // !!! 여기만 변경: 외부 이미지를 프록시로 감싸서 CORS 캔버스 오염 방지
+        image: '/api/img?url=' + encodeURIComponent(prtsIcon(nameCN)),
       });
     }
 
