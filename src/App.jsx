@@ -608,7 +608,7 @@ export default function TierListApp() {
               {t('loadAll')}
             </BlobButton>
             {/* PNG Export */}
-            <ExportPNG targetId="tierboard" fileName="tierlist" scale={3} />
+            <ExportPNG targetId="tierlist-capture" fileName="tierlist" scale={3} />
 
 
             {/* Name toggle */}
@@ -682,8 +682,9 @@ export default function TierListApp() {
         </section>
 
         {/* Tiers */}
-        <section className="space-y-4">
-          {tiers.map((tier,idx)=> (
+        <div id="tierlist-capture">
+<section className="space-y-4">
+          {tiers.filter(t=> (t.items?.length||0) > 0).map((tier,idx)=> (
             <div key={idx} className="relative group/tier">
               <div className="flex items-stretch gap-3">
                 {/* Left tier label */}
@@ -782,6 +783,7 @@ export default function TierListApp() {
             </div>
           ))}
         </section>
+</div>
       </main>
 
       <style>{`
