@@ -684,7 +684,7 @@ export default function TierListApp() {
         {/* Tiers */}
         <div id="tierlist-capture">
 <section className="space-y-4">
-          {tiers.filter(t=> (t.items?.length||0) > 0).map((tier,idx)=> (
+          {tiers.map((tier,idx)=> (
             <div key={idx} className="relative group/tier">
               <div className="flex items-stretch gap-3">
                 {/* Left tier label */}
