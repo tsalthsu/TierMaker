@@ -1,5 +1,21 @@
-import { useRef } from 'react'; 
+import { useRef } from 'react';
 import * as domtoimage from 'dom-to-image-more';
+
+async function waitForImages(node) {
+  const imgs = Array.from(node.querySelectorAll('img'));
+  await Promise.all(
+    imgs.map(async (img) => {
+      try {
+        // decode()가 가장 확실 (지원 안 하면 load 완료 체크)
+        if ('decode' in img) await img.decode();
+        else if (!img.complete) await new Promise((res, rej) => {
+          img.onload = () => res();
+          img.onerror = () => res(); // 에러여도 계속
+        });
+      } catch { /* ignore */ }
+    })
+  );
+}
 
 export default function ExportPNG({
   targetId = 'tierboard',
@@ -13,11 +29,14 @@ export default function ExportPNG({
     if (busy.current) return;
     busy.current = true;
 
+    const html = document.documentElement;
+    html.classList.add('exporting'); // 전역 export 모드
+
     try {
       const node = document.getElementById(targetId);
       if (!node) throw new Error(`Target element not found: #${targetId}`);
 
-      // 숨길 요소 처리
+      // 툴바/버튼 비노출
       const hidden = [];
       node.querySelectorAll('[data-export-hide="true"]').forEach((el) => {
         const prev = el.style.visibility;
@@ -25,8 +44,12 @@ export default function ExportPNG({
         el.style.visibility = 'hidden';
       });
 
-      const width = node.scrollWidth;
-      const height = node.scrollHeight;
+      // 폰트/이미지 준비 대기
+      if (document.fonts?.ready) { try { await document.fonts.ready; } catch {} }
+      await waitForImages(node);
+
+      const width = Math.ceil(node.scrollWidth);
+      const height = Math.ceil(node.scrollHeight);
 
       const dataUrl = await domtoimage.toPng(node, {
         bgcolor: bgColor,
@@ -40,6 +63,7 @@ export default function ExportPNG({
         },
       });
 
+      // 복구
       hidden.forEach(([el, prev]) => (el.style.visibility = prev));
 
       const a = document.createElement('a');
@@ -50,6 +74,7 @@ export default function ExportPNG({
       console.error(err);
       alert('PNG 내보내기 오류 (콘솔 확인)');
     } finally {
+      html.classList.remove('exporting');
       busy.current = false;
     }
   };
