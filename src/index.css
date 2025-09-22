@@ -38,3 +38,8 @@ html, body, #root {
 .exporting body, .exporting html {
   overflow: visible !important;
 }
+
+/* 캡처 모드에서는 빈 티어 줄 숨기기 */
+.exporting .tier-row:has(.tier-items:empty) {
+  display: none !important;
+}
