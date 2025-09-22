@@ -23,9 +23,6 @@ function bad(status, msg) {
 const SRC =
   'https://raw.githubusercontent.com/Kengxxiao/ArknightsGameData/master/zh_CN/gamedata/excel/character_table.json';
 
-const prtsIcon = (cnName) =>
-  `https://prts.wiki/w/Special:FilePath/${encodeURIComponent('头像_' + cnName)}.png`;
-
 // ----- 예외 아이콘 매핑 -----
 // key: CN name(중문), value: 직접 링크
 const ICON_OVERRIDES = {
