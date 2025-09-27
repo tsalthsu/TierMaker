@@ -798,50 +798,36 @@ export default function TierListApp() {
         .animate-pop { animation: pop .4s cubic-bezier(.2,1,.4,1); }
         @keyframes pop { 0% { transform: scale(.92); } 60% { transform: scale(1.06); } 100% { transform: scale(1); } }
         @keyframes sparkle {
-  0%   { transform: translate(0,0) scale(.6); opacity: 1; }
-  70%  { opacity: 1; }
-  100% { transform: translate(var(--dx), var(--dy)) scale(1.15); opacity: 0; }
+  0%   { transform: translate(0,0) scale(.5); opacity: 1; }
+  50%  { transform: translate(var(--dx), var(--dy)) scale(1); opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) scale(1.2); opacity: 0; }
 }
         .sparkle {
   position: fixed;
-  width: 10px; height: 10px;
-  /* 중심은 밝고, 가장자리는 투명해지는 금빛 그라디언트 */
-  background: radial-gradient(circle at 30% 30%,
-    #fff8e1 0%,
-    #fde68a 40%,
-    #f59e0b 65%,
-    rgba(245,158,11,0) 70%
-  );
-  border-radius: 50%;
+  width: 12px;
+  height: 12px;
+  background: transparent;
   pointer-events: none;
-  transform: translate(0,0) scale(.7);
-  animation: sparkle 480ms ease-out forwards;
-  /* 금빛 글로우 */
+  animation: sparkle 600ms ease-out forwards;
+  transform: translate(0,0) scale(.6);
   filter:
-    drop-shadow(0 0 10px rgba(251,191,36,.95))
-    drop-shadow(0 0 20px rgba(245,158,11,.45));
+    drop-shadow(0 0 6px rgba(251,191,36,.95))
+    drop-shadow(0 0 14px rgba(245,158,11,.6));
 }
 
-/* 반짝이는 십자형 광선 2겹 (회전 차이) */
+/* ✦ 십자형 별 모양 */
 .sparkle::before,
 .sparkle::after {
-  content: '';
+  content: "";
   position: absolute;
-  inset: -4px;                 /* 살짝 크게 */
-  background:
-    conic-gradient(from 0deg,
-      rgba(253,224,71,0) 0deg 12deg,
-      rgba(253,224,71,.85) 12deg 18deg,
-      rgba(253,224,71,0) 18deg 42deg,
-      rgba(253,224,71,.85) 42deg 48deg,
-      rgba(253,224,71,0) 48deg 360deg
-    );
-  /* 가운데는 뚫고 가장자리만 보이게 */
-  -webkit-mask: radial-gradient(circle, transparent 55%, black 56%);
-  mask: radial-gradient(circle, transparent 55%, black 56%);
-  filter: blur(.4px);
+  inset: 0;
+  background: linear-gradient(to right, transparent, #facc15, transparent);
+  transform: rotate(0deg);
 }
-.sparkle::after { transform: rotate(45deg); }
+.sparkle::after {
+  background: linear-gradient(to bottom, transparent, #facc15, transparent);
+  transform: rotate(0deg);
+}
         @keyframes bubble { 0% { transform: translateY(0) scale(1); opacity: .8 } 50% { transform: translateY(-6px) scale(1.05); opacity: 1 } 100% { transform: translateY(0) scale(1); opacity: .8 } }
         .tier-inset-light { box-shadow: inset 0 10px 24px rgba(0,0,0,0.08), inset 0 -10px 24px rgba(0,0,0,0.06), inset 0 0 0 2px rgba(0,0,0,0.03); background: radial-gradient(120% 60% at 50% 40%, rgba(255,255,255,0.55), rgba(255,255,255,0) 70%); }
         .tier-inset-dark  { 
@@ -989,14 +975,15 @@ function Toast({msg, type='info', isDark}){
   );
 }
 
-/* Spinner 버튼 (AK 스타일) */
+/** Button with optional spinner */
 function BlobButton({children,onClick,disabled,loading}){
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`ak-btn ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
+      className={`relative inline-flex items-center justify-center px-4 py-2 rounded-2xl font-semibold text-slate-900 shadow-lg active:scale-[0.98] transition select-none ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
+      style={{background:'linear-gradient(180deg,#93c5fd,#38bdf8)', filter:'url(#goo)'}}
     >
       <span className="relative z-10 flex items-center gap-2">
         {loading && (
@@ -1005,37 +992,31 @@ function BlobButton({children,onClick,disabled,loading}){
             <path d="M21 12a9 9 0 0 1-9 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
           </svg>
         )}
-        <span>{children}</span>
+        {children}
+      </span>
+      <span className="absolute inset-0 overflow-hidden rounded-2xl">
+        <span className="absolute w-8 h-8 bg-white/50 rounded-full left-2 top-2 animate-[bubble_2.4s_ease-in-out_infinite]"/>
+        <span className="absolute w-6 h-6 bg-white/40 rounded-full right-3 top-3 animate-[bubble_2s_.2s_ease-in-out_infinite]"/>
+        <span className="absolute w-7 h-7 bg-white/40 rounded-full left-3 bottom-3 animate-[bubble_2.2s_.1s_ease-in-out_infinite]"/>
       </span>
     </button>
   );
 }
 
-
-/****************************************
- * Theme toggle (pos: 'br'|'bl')
- ****************************************/
+/** Theme toggle (pos: 'br'|'bl') */
 function ThemeToggle({isDark,onToggle,position="br"}){
   const posClass = position==="bl" ? "left-3 bottom-3" : "right-3 bottom-3";
   return (
     <button
       onClick={onToggle}
       title={isDark?'Light mode':'Dark mode'}
-      className={`fixed ${posClass} z-[60] ak-btn ak-btn-icon`}
+      className={`fixed ${posClass} z-[60] w-10 h-10 grid place-items-center rounded-2xl border shadow-lg active:scale-95 transition ${isDark?'bg-slate-800/80 border-white/10 text-white':'bg-white border-slate-200 text-slate-900'}`}
+      style={{filter:'url(#goo)'}}
     >
-      {isDark ? (
-        /* Sun */
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
-             stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="12" r="5"/>
-          <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
-        </svg>
+      {isDark? (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"></path></svg>
       ) : (
-        /* Moon */
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
-             stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
-        </svg>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
       )}
     </button>
   );
