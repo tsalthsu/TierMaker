@@ -93,10 +93,13 @@ export default async function handler() {
           : nameCN;
 
       list.push({
-        id: key,
-        label,
-        image: '/api/img?url=' + encodeURIComponent(prtsIcon(nameCN)),
-      });
+  id: key,
+  en: c.appellation || key,   // 영어 이름
+  ko: NAME_FIX[c.appellation] || '', // 필요하면 한국어 직접 매핑
+  ja: '', // 일본어도 필요 시 추가
+  zh: nameCN,                 // 중국어 이름
+  image: '/api/img?url=' + encodeURIComponent(prtsIcon(nameCN)),
+});
     }
 
     list.sort((a, b) => a.label.localeCompare(b.label, 'en'));
