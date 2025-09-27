@@ -6,13 +6,14 @@ async function waitForImages(node) {
   await Promise.all(
     imgs.map(async (img) => {
       try {
-        // decode()가 가장 확실 (지원 안 하면 load 완료 체크)
         if ('decode' in img) await img.decode();
-        else if (!img.complete) await new Promise((res, rej) => {
-          img.onload = () => res();
-          img.onerror = () => res(); // 에러여도 계속
-        });
-      } catch { /* ignore */ }
+        else if (!img.complete) {
+          await new Promise((res) => {
+            img.onload = () => res();
+            img.onerror = () => res();
+          });
+        }
+      } catch {}
     })
   );
 }
@@ -30,13 +31,13 @@ export default function ExportPNG({
     busy.current = true;
 
     const html = document.documentElement;
-    html.classList.add('exporting'); // 전역 export 모드
+    html.classList.add('exporting'); // export 모드 켜기
 
     try {
       const node = document.getElementById(targetId);
       if (!node) throw new Error(`Target element not found: #${targetId}`);
 
-      // 툴바/버튼 비노출
+      // data-export-hide 숨기기
       const hidden = [];
       node.querySelectorAll('[data-export-hide="true"]').forEach((el) => {
         const prev = el.style.visibility;
@@ -44,8 +45,9 @@ export default function ExportPNG({
         el.style.visibility = 'hidden';
       });
 
-      // 폰트/이미지 준비 대기
-      if (document.fonts?.ready) { try { await document.fonts.ready; } catch {} }
+      if (document.fonts?.ready) {
+        try { await document.fonts.ready; } catch {}
+      }
       await waitForImages(node);
 
       const width = Math.ceil(node.scrollWidth);
@@ -54,16 +56,15 @@ export default function ExportPNG({
       const dataUrl = await domtoimage.toPng(node, {
         bgcolor: bgColor,
         cacheBust: true,
-        style: { transform: `scale(${scale})`, transformOrigin: 'top left' },
+        // transform 제거 → 깨짐 방지
         width: width * scale,
         height: height * scale,
-        filter: (el) => {
-          const htmlEl = el;
-          return htmlEl?.getAttribute?.('data-export-hide') !== 'true';
+        style: {
+          imageRendering: 'auto',
         },
+        filter: (el) => el?.getAttribute?.('data-export-hide') !== 'true',
       });
 
-      // 복구
       hidden.forEach(([el, prev]) => (el.style.visibility = prev));
 
       const a = document.createElement('a');
@@ -85,7 +86,7 @@ export default function ExportPNG({
       onClick={handleExport}
       className="px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700"
     >
-      PNG
+      PNG 저장
     </button>
   );
 }
