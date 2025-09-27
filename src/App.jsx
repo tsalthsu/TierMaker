@@ -772,7 +772,7 @@ function triggerSparkles(x, y) {
                 <div className="w-24 shrink-0 rounded-2xl shadow-lg overflow-visible border" style={{borderColor: isDark? 'rgba(255,255,255,0.1)':'#e5e7eb'}}>
                   <div className="relative h-full min-h-[64px] rounded-2xl overflow-visible grid place-items-center font-extrabold text-base text-slate-900 select-none" style={{ background:`linear-gradient(135deg, ${tier.color}, #ffffff)` }} onContextMenu={e=>{ e.preventDefault(); e.stopPropagation(); setOpenTierMenu(openTierMenu===idx? null: idx); }} onClick={e=> e.stopPropagation()}>
                     {editingTierIndex===idx ? (
-                      <input autoFocus value={editingTierValue} onChange={e=> setEditingTierValue(e.target.value)} onBlur={commitEditTier} onKeyDown={e=> e.key==='Enter' && commitEditTier()} className="w-20 mx-1 rounded-lg px-1 py-0.5 bg-white/80 text-slate-900 text-sm focus:outline-none"/>
+                      <input autoFocus value={editingTierValue} onChange={e=> setEditingTierValue(e.target.value)} onBlur={commitEditTier} onKeyDown={e=> e.key==='Enter' && commitEditTier()} className="w-20 mx-1 rounded px-1 py-0.5 bg-white/80 text-slate-900 text-sm focus:outline-none"/>
                     ) : (
                       <button onClick={()=> startEditTier(idx)} title="Edit tier name" className="w-full h-full">{tier.name}</button>
                     )}
@@ -781,8 +781,8 @@ function triggerSparkles(x, y) {
                         <label className="flex items-center justify-between text-sm mb-2">Color
                           <input type="color" value={tier.color} onChange={e=> setTierColor(idx, e.target.value)} className="w-6 h-6 border-0 p-0 bg-transparent cursor-pointer" />
                         </label>
-                        <button onClick={()=> startEditTier(idx)} className="w-full text-left text-sm px-2 py-1 rounded-lg hover:bg-black/5">Rename</button>
-                        <button onClick={()=> { removeTier(idx); setOpenTierMenu(null); }} className="w-full text-left text-sm px-2 py-1 rounded-lg hover:bg-black/5 text-rose-500">Delete tier</button>
+                        <button onClick={()=> startEditTier(idx)} className="w-full text-left text-sm px-2 py-1 rounded hover:bg-black/5">Rename</button>
+                        <button onClick={()=> { removeTier(idx); setOpenTierMenu(null); }} className="w-full text-left text-sm px-2 py-1 rounded hover:bg-black/5 text-rose-500">Delete tier</button>
                       </div>
                     )}
                   </div>
@@ -988,10 +988,10 @@ function DraggableItem({ item, onDragStart, justPopped, index, isDark, onRename,
       {open && (
         <div className={`absolute top-9 right-1 z-[80] rounded border p-2 w-48 overflow-hidden ${isDark?'bg-slate-900 border-white/10 text-white':'bg-white border-slate-200 text-slate-900'} shadow-2xl`} onClick={e=> e.stopPropagation()}>
           <div className="flex items-center gap-2 mb-2">
-            <input className={`w-32 text-sm px-2 py-1 rounded-lg border ${isDark?'bg-slate-800 border-white/10':'bg-white border-slate-200'}`} defaultValue={name} onKeyDown={e=>{ if(e.key==='Enter'){ const v=e.currentTarget.value.trim()||name; onRename&&onRename(v); setOpen(false);} }} />
-            <button onClick={e=>{ const inp=e.currentTarget.parentElement?.querySelector('input'); const v=(inp?.value||'').trim()||name; onRename&&onRename(v); setOpen(false); }} className="text-sm px-2 py-1 rounded-lg bg-emerald-500/90 text-white whitespace-nowrap">OK</button>
+            <input className={`w-32 text-sm px-2 py-1 rounded border ${isDark?'bg-slate-800 border-white/10':'bg-white border-slate-200'}`} defaultValue={name} onKeyDown={e=>{ if(e.key==='Enter'){ const v=e.currentTarget.value.trim()||name; onRename&&onRename(v); setOpen(false);} }} />
+            <button onClick={e=>{ const inp=e.currentTarget.parentElement?.querySelector('input'); const v=(inp?.value||'').trim()||name; onRename&&onRename(v); setOpen(false); }} className="text-sm px-2 py-1 rounded bg-emerald-500/90 text-white whitespace-nowrap">OK</button>
           </div>
-          <button onClick={()=>{ onDelete&&onDelete(); setOpen(false); }} className="w-full text-left text-sm px-2 py-1 rounded-lg hover:bg-black/5 text-rose-500">Delete</button>
+          <button onClick={()=>{ onDelete&&onDelete(); setOpen(false); }} className="w-full text-left text-sm px-2 py-1 rounded hover:bg-black/5 text-rose-500">Delete</button>
         </div>
       )}
 
