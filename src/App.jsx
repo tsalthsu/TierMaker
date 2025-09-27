@@ -312,8 +312,8 @@ export default function TierListApp() {
     if(!id) return;
     if(from==='pool'){ setPool(prev=> prev.filter(pid=> pid!==id)); }
     else { setTiers(prev=>{ const copy=prev.map(t=>({...t,items:[...t.items]})); const arr=copy[from.tierIndex].items; copy[from.tierIndex].items=arr.filter((x,i)=> !(x===id && i===from.index)); return copy; }); }
-    if(to==='pool'){ setPool(prev=> insertAt(prev.filter(x=>x!==id), prev.length, id)); }
-    else { setTiers(prev=>{ const copy=prev.map(t=>({...t,items:[...t.items]})); const arr=copy[to.tierIndex].items.filter(x=>x!==id); const insertIndex=clamp(to.index ?? arr.length,0,arr.length); arr.splice(insertIndex,0,id); copy[to.tierIndex].items=arr; return copy; }); }
+    if(to==='pool'){ setPool(prev=> insertAt(prev.filter(x=> x!==id), prev.length, id)); }
+    else { setTiers(prev=>{ const copy=prev.map(t=>({...t,items:[...t.items]})); const arr=copy[to.tierIndex].items.filter(x=> x!==id); const insertIndex=clamp(to.index ?? arr.length,0,arr.length); arr.splice(insertIndex,0,id); copy[to.tierIndex].items=arr; return copy; }); }
   }
 
   function onDropToTier(e, tierIndex){
@@ -324,24 +324,22 @@ export default function TierListApp() {
       let insertIndex=computeInsertIndex(container,e.clientX,e.clientY,(data.from && data.from.tierIndex===tierIndex)? data.id : null);
       moveItem({ id:data.id, from:data.from, to:{ tierIndex, index:insertIndex } });
       if (tierIndex === 0) {
-  setJustPoppedId(data.id);
-  // 상태 반영 후 DOM에 카드가 렌더링된 다음 위치 계산
-  requestAnimationFrame(() => {
-    const card = tierContainerRefs.current[tierIndex]?.querySelector(
-      `[data-role="card"][data-id="${data.id}"]`
-    );
-    if (card) {
-      const r = card.getBoundingClientRect();
-      const cx = r.left + r.width / 2;
-      const cy = r.top + r.height / 2;
-      triggerSparkles(cx, cy);
-    } else {
-      // 혹시 못 찾았을 때는 임시로 마우스 좌표
-      triggerSparkles(e.clientX, e.clientY);
-    }
-  });
-  setTimeout(() => setJustPoppedId(null), 450);
-}
+        setJustPoppedId(data.id);
+        requestAnimationFrame(() => {
+          const card = tierContainerRefs.current[tierIndex]?.querySelector(
+            `[data-role="card"][data-id="${data.id}"]`
+          );
+          if (card) {
+            const r = card.getBoundingClientRect();
+            const cx = r.left + r.width / 2;
+            const cy = r.top + r.height / 2;
+            triggerSparkles(cx, cy);
+          } else {
+            triggerSparkles(e.clientX, e.clientY);
+          }
+        });
+        setTimeout(() => setJustPoppedId(null), 450);
+      }
     } catch {}
     onDragEnd();
   }
@@ -422,7 +420,34 @@ export default function TierListApp() {
     return p.x >= r.left - margin && p.x <= r.right + margin && p.y >= r.top - margin && p.y <= r.bottom + margin;
   };
 
-  function triggerSparkles(x,y){ const id=uid(); const N=12; const arr=Array.from({length:N}).map((_,i)=>({ id:`${id}-${i}`, x,y, createdAt:Date.now(), angle:(Math.PI*2*i)/N + (Math.random()*0.4-0.2), dist:40+Math.random()*30 })); setSparkles(prev=>[...prev,...arr]); }
+  // ====== GAME EFFECT triggerSparkles (stars + dust, random) ======
+  function triggerSparkles(x, y) {
+    const id = uid();
+    const stars = 3 + Math.floor(Math.random() * 2);   // 3~4
+    const dusts = 10 + Math.floor(Math.random() * 3);  // 10~12
+    const N = stars + dusts;
+
+    const arr = Array.from({ length: N }, (_, i) => {
+      const isStar = i < stars;
+      const angle  = Math.random() * Math.PI * 2;
+      const dist   = (isStar ? 22 : 18) + Math.random() * (isStar ? 38 : 30);
+      const jitterX = (Math.random() - 0.5) * 12;
+      const jitterY = (Math.random() - 0.5) * 12;
+      const size = isStar ? (14 + Math.random() * 10) : (6 + Math.random() * 6);
+
+      return {
+        id: `${id}-${i}`,
+        x: x + jitterX,
+        y: y + jitterY,
+        angle,
+        dist,
+        size,
+        variant: isStar ? "star" : "dust",
+        createdAt: Date.now(),
+      };
+    });
+    setSparkles(prev => [...prev, ...arr]);
+  }
 
   const [editingTierIndex,setEditingTierIndex]=useState(null);
   const [editingTierValue,setEditingTierValue]=useState('');
@@ -541,7 +566,7 @@ export default function TierListApp() {
   return (
     <div className={`${isDark?'text-white':'text-slate-900'} min-h-screen transition-colors duration-300 ${isDark?'bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800':'bg-gradient-to-br from-slate-100 via-white to-slate-100'}`}>
       <GooDefs/>
-      <div ref={overlayRef} className="pointer-events-none fixed inset-0 z-50">{sparkles.map(s=> <Sparkle key={s.id} x={s.x} y={s.y} angle={s.angle} dist={s.dist}/> )}</div>
+      <div ref={overlayRef} className="pointer-events-none fixed inset-0 z-50">{sparkles.map(s=> <Sparkle key={s.id} x={s.x} y={s.y} angle={s.angle} dist={s.dist} size={s.size} variant={s.variant}/> )}</div>
 
       {/* Theme toggle moved to bottom-left */}
       <ThemeToggle isDark={isDark} onToggle={()=> setTheme(isDark?'light':'dark')} position="bl" />
@@ -718,7 +743,7 @@ export default function TierListApp() {
                         <label className="flex items-center justify-between text-sm mb-2">Color
                           <input type="color" value={tier.color} onChange={e=> setTierColor(idx, e.target.value)} className="w-6 h-6 border-0 p-0 bg-transparent cursor-pointer" />
                         </label>
-                        <button onClick={()=> startEditTier(idx)} className="w-full text-left text-sm px-2 py-1 rounded-lg hover:bg-black/5">Rename</button>
+                        <button onClick={()=> startEditTier(idx)} className="w-full text-left text-sm px-2 py-1 rounded-lg hover:bg:black/5">Rename</button>
                         <button onClick={()=> { removeTier(idx); setOpenTierMenu(null); }} className="w-full text-left text-sm px-2 py-1 rounded-lg hover:bg-black/5 text-rose-500">Delete tier</button>
                       </div>
                     )}
@@ -815,64 +840,18 @@ export default function TierListApp() {
         .item-card:hover:after { opacity: 1; }
         .animate-pop { animation: pop .4s cubic-bezier(.2,1,.4,1); }
         @keyframes pop { 0% { transform: scale(.92); } 60% { transform: scale(1.06); } 100% { transform: scale(1); } }
-        @keyframes sparkle {
-  0%   { transform: translate(0,0) scale(.6); opacity: 1; }
-  50%  { transform: translate(var(--dx), var(--dy)) scale(1.0); opacity: 1; }
-  100% { transform: translate(var(--dx), var(--dy)) scale(1.2); opacity: 0; }
-}
-        /* ✦ 금빛 별 파티클 (네모 방지: 코어(원형) + 별팔은 자식에만 필터) */
-.sparkle {
-  position: fixed;
-  width: 24px;
-  height: 24px;
-  pointer-events: none;
-  background: transparent !important; /* 부모는 완전 투명 */
-  transform: translate(0,0) scale(.75);
-  animation: sparkle 600ms ease-out forwards;
-  /* 부모에는 drop-shadow를 주지 않음(네모 현상 방지) */
-}
 
-/* 코어(원형) – 진짜 금빛 점 */
-.sparkle::before {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 12px;
-  height: 12px;
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  background: radial-gradient(circle,
-    #fff8e1 0%,
-    #fde047 45%,
-    rgba(253,224,71,.0) 65%
-  );
-  /* 글로우는 코어에만 */
-  filter:
-    drop-shadow(0 0 8px rgba(251,191,36,.95))
-    drop-shadow(0 0 18px rgba(245,158,11,.55));
-}
-/* 별빛 팔(✦) – conic-gradient + 중앙 마스크로 팔만 보이게 */
-.sparkle::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background:
-    conic-gradient(
-      from 0deg,
-      transparent 0deg 14deg,  rgba(253,224,71,.95) 14deg 18deg,
-      transparent 18deg 72deg, rgba(253,224,71,.95) 72deg 76deg,
-      transparent 76deg 134deg,rgba(253,224,71,.95) 134deg 138deg,
-      transparent 138deg 196deg,rgba(253,224,71,.95) 196deg 200deg,
-      transparent 200deg 258deg,rgba(253,224,71,.95) 258deg 262deg,
-      transparent 262deg 320deg,rgba(253,224,71,.95) 320deg 324deg,
-      transparent 324deg 360deg
-    );
-  /* 가운데는 뚫고 팔만 보이게 */
-  -webkit-mask: radial-gradient(circle, transparent 44%, black 45%);
-  mask: radial-gradient(circle, transparent 44%, black 45%);
-  filter: blur(.4px);
-}
+        /* ===== GAME EFFECT sparkles ===== */
+        @keyframes sparkleMove {
+          0%   { transform: translate(0,0) rotate(var(--rot,0)) scale(.7); opacity: 1; }
+          60%  { opacity: 1; }
+          100% { transform: translate(var(--dx), var(--dy)) rotate(calc(var(--rot,0) + 20deg)) scale(1.1); opacity: 0; }
+        }
+        .sparkle { position: fixed; pointer-events: none; will-change: transform, opacity; }
+        .sparkle.star { width: var(--size,18px); height: var(--size,18px); animation: sparkleMove 700ms ease-out forwards; mix-blend-mode: screen; }
+        .sparkle.star .glow { filter: drop-shadow(0 0 8px rgba(255,215,64,.95)) drop-shadow(0 0 18px rgba(245,158,11,.55)); }
+        .sparkle.dust { width: var(--size,8px); height: var(--size,8px); border-radius: 50%; background: radial-gradient(circle, #fff8e1 0%, #fde047 50%, transparent 70%); animation: sparkleMove 800ms ease-out forwards; filter: drop-shadow(0 0 6px rgba(251,191,36,.9)) drop-shadow(0 0 14px rgba(245,158,11,.45)); mix-blend-mode: screen; }
+
         @keyframes bubble { 0% { transform: translateY(0) scale(1); opacity: .8 } 50% { transform: translateY(-6px) scale(1.05); opacity: 1 } 100% { transform: translateY(0) scale(1); opacity: .8 } }
         .tier-inset-light { box-shadow: inset 0 10px 24px rgba(0,0,0,0.08), inset 0 -10px 24px rgba(0,0,0,0.06), inset 0 0 0 2px rgba(0,0,0,0.03); background: radial-gradient(120% 60% at 50% 40%, rgba(255,255,255,0.55), rgba(255,255,255,0) 70%); }
         .tier-inset-dark  { 
@@ -926,232 +905,4 @@ function DraggableItem({ item, onDragStart, justPopped, index, isDark, onRename,
       className={`item-card ${square?'square':''} group select-none border shadow-lg hover:-translate-y-0.5 transition transform ${justPopped?'animate-pop':''} ${isDark?'bg-slate-800/80 border-white/10':'bg-white/90 border-slate-200'} ${isDragging?'opacity-50':''}`}
     >
       {open && (
-        <div className={`absolute top-9 right-1 z-[80] rounded-xl border p-2 w-48 overflow-hidden ${isDark?'bg-slate-900 border-white/10 text-white':'bg-white border-slate-200 text-slate-900'} shadow-2xl`} onClick={e=> e.stopPropagation()}>
-          <div className="flex items-center gap-2 mb-2">
-            <input className={`w-32 text-sm px-2 py-1 rounded-lg border ${isDark?'bg-slate-800 border-white/10':'bg-white border-slate-200'}`} defaultValue={name} onKeyDown={e=>{ if(e.key==='Enter'){ const v=e.currentTarget.value.trim()||name; onRename&&onRename(v); setOpen(false);} }} />
-            <button onClick={e=>{ const inp=e.currentTarget.parentElement?.querySelector('input'); const v=(inp?.value||'').trim()||name; onRename&&onRename(v); setOpen(false); }} className="text-sm px-2 py-1 rounded-lg bg-emerald-500/90 text-white whitespace-nowrap">OK</button>
-          </div>
-          <button onClick={()=>{ onDelete&&onDelete(); setOpen(false); }} className="w-full text-left text-sm px-2 py-1 rounded-lg hover:bg-black/5 text-rose-500">Delete</button>
-        </div>
-      )}
-
-      <div className="item-img">
-        {item.image
-          ? <img src={item.image} alt={name} className="img-el" draggable={false} crossOrigin="anonymous" />
-          : <div className={`${isDark?'bg-slate-700/70 text-white/70':'bg-slate-100 text-slate-400'} w-full h-full flex items-center justify-center text-xs`}>IMG</div>}
-      </div>
-
-      {showNames && (
-        <div className={`item-name ${isDark? 'bg-slate-900/35 text-white':'bg-white/85 text-slate-900'}`}>
-          <FitText text={name} maxFont={14} minFont={7}  maxLines={1} />
-        </div>
-      )}
-    </div>
-  );
-}
-
-function GhostPreview({item,isDark,showNames,name}){
-  if(!item) return null;
-  const square = !showNames;
-  return (
-    <div className={`item-card ${square?'square':''} ghost-card border-2 ${isDark?'bg-slate-800/50 border-white/20':'bg-white/60 border-slate-300/60'}`} data-role="card-ghost">
-      <div className="item-img" style={{opacity:.6}}>
-        {item.image ? <img src={item.image} alt="ghost" className="img-el" crossOrigin="anonymous" /> :
-          <div className={`${isDark?'bg-slate-700/60 text-white/50':'bg-slate-100 text-slate-400'} w-full h-full flex items-center justify-center text-xs`}>IMG</div>}
-      </div>
-      {showNames && (
-        <div className={`item-name ${isDark? 'bg-slate-900/25 text-white/80':'bg-white/70 text-slate-800'}`} style={{opacity:.9}}>
-          <FitText text={name} maxFont={14} minFont={7}  maxLines={1} />
-        </div>
-      )}
-    </div>
-  );
-}
-
-function FitText({ text, maxFont=20, minFont=10, maxLines=2 }){
-  const ref = useRef(null);
-  useEffect(()=>{
-    const el = ref.current;
-    if(!el) return;
-    let alive = true;
-    let size = maxFont; let iter = 0;
-    const apply = () => {
-      if(!alive || !el) return;
-      try {
-        el.style.fontSize = size+'px';
-        el.style.display='-webkit-box';
-        el.style.webkitBoxOrient='vertical';
-        el.style.webkitLineClamp=String(maxLines);
-        el.style.wordBreak='break-word';
-        el.style.overflowWrap='anywhere';
-        el.style.width='100%';
-        el.style.height='100%';
-      } catch {}
-    };
-    const fits = () => {
-      if(!alive || !el) return true;
-      return el.scrollHeight<=el.clientHeight && el.scrollWidth<=el.clientWidth;
-    };
-    apply();
-    const shrink = () => {
-      if(!alive || !el) return;
-      while(!fits() && size>minFont && iter<30){ size-=1; iter++; apply(); }
-    };
-    const raf = requestAnimationFrame(shrink);
-    return () => { alive = false; cancelAnimationFrame(raf); };
-  },[text,maxFont,minFont,maxLines]);
-  return <span ref={ref} style={{display:'-webkit-box', WebkitLineClamp:maxLines, WebkitBoxOrient:'vertical', overflow:'hidden', width:'100%', height:'100%'}}>{text}</span>;
-}
-
-function Sparkle({ x, y, angle, dist }) {
-  const dx = Math.cos(angle) * dist;
-  const dy = Math.sin(angle) * dist;
-  return (
-    <div
-      className="sparkle"
-      style={{ left: x, top: y, "--dx": `${dx}px`, "--dy": `${dy}px` }}
-    />
-  );
-}
-
-/** Toast bubble */
-function Toast({msg, type='info', isDark}){
-  const tone = type==='success' ? (isDark?'bg-emerald-500/15 text-emerald-200 border-emerald-400/30':'bg-emerald-50 text-emerald-800 border-emerald-300')
-             : type==='warn'    ? (isDark?'bg-amber-500/15 text-amber-200 border-amber-400/30':'bg-amber-50 text-amber-900 border-amber-300')
-             : type==='error'   ? (isDark?'bg-rose-500/15 text-rose-200 border-rose-400/30':'bg-rose-50 text-rose-900 border-rose-300')
-             :                    (isDark?'bg-white/10 text-white border-white/15':'bg-white text-slate-900 border-slate-200');
-  return (
-    <div className={`toast [animation-fill-mode:forwards]`} data-life="short">
-      <div className={`min-w-[220px] max-w-[60vw] px-3 py-2 rounded-xl border shadow-lg ${tone}`}>
-        <div className="text-sm">{msg}</div>
-      </div>
-    </div>
-  );
-}
-
-/** Button with optional spinner */
-function BlobButton({children,onClick,disabled,loading}){
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={`relative inline-flex items-center justify-center px-4 py-2 rounded-2xl font-semibold text-slate-900 shadow-lg active:scale-[0.98] transition select-none ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
-      style={{background:'linear-gradient(180deg,#93c5fd,#38bdf8)', filter:'url(#goo)'}}
-    >
-      <span className="relative z-10 flex items-center gap-2">
-        {loading && (
-          <svg className="spin" width="16" height="16" viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" opacity="0.2"/>
-            <path d="M21 12a9 9 0 0 1-9 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
-          </svg>
-        )}
-        {children}
-      </span>
-      <span className="absolute inset-0 overflow-hidden rounded-2xl">
-        <span className="absolute w-8 h-8 bg-white/50 rounded-full left-2 top-2 animate-[bubble_2.4s_ease-in-out_infinite]"/>
-        <span className="absolute w-6 h-6 bg-white/40 rounded-full right-3 top-3 animate-[bubble_2s_.2s_ease-in-out_infinite]"/>
-        <span className="absolute w-7 h-7 bg-white/40 rounded-full left-3 bottom-3 animate-[bubble_2.2s_.1s_ease-in-out_infinite]"/>
-      </span>
-    </button>
-  );
-}
-
-/** Theme toggle (pos: 'br'|'bl') */
-function ThemeToggle({isDark,onToggle,position="br"}){
-  const posClass = position==="bl" ? "left-3 bottom-3" : "right-3 bottom-3";
-  return (
-    <button
-      onClick={onToggle}
-      title={isDark?'Light mode':'Dark mode'}
-      className={`fixed ${posClass} z-[60] w-10 h-10 grid place-items-center rounded-2xl border shadow-lg active:scale-95 transition ${isDark?'bg-slate-800/80 border-white/10 text-white':'bg-white border-slate-200 text-slate-900'}`}
-      style={{filter:'url(#goo)'}}
-    >
-      {isDark? (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"></path></svg>
-      ) : (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
-      )}
-    </button>
-  );
-}
-
-/** Hover-animated language picker (closeDelay adjustable) */
-function LangPicker({lang,setLang,langs,flags,names,isDark,open,setOpen,label,closeDelayMs=100}){
-  const ref = useRef(null);
-  const timeoutRef = useRef(null);
-
-  const handleMouseEnter = () => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
-    setOpen(true);
-  };
-
-  const handleMouseLeave = () => {
-    timeoutRef.current = setTimeout(() => {
-      setOpen(false);
-      timeoutRef.current = null;
-    }, closeDelayMs);
-  };
-
-  return (
-    <div
-      ref={ref}
-      className="relative"
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-    >
-      {/* anchor / compact button */}
-      <button
-        type="button"
-        className={`px-3 py-2 rounded-xl border text-sm flex items-center gap-2 ${isDark?'bg-white/10 border-white/10 text-white':'bg-white border-slate-200 text-slate-900'}`}
-        title={label}
-      >
-        <span style={{fontSize:14}}>{flags[lang] || '🌐'}</span>
-        <span className="hidden sm:inline">{names[lang] || 'Language'}</span>
-      </button>
-
-      {/* pop choices */}
-      <div className={`absolute right-0 mt-2 lang-pop ${open?'open':'closed'}`}>
-        <div className={`p-2 rounded-2xl shadow-2xl border ${isDark?'bg-slate-900/95 border-white/10':'bg-white/95 border-slate-200'} flex flex-col gap-1`}>
-          {langs.map(code=> (
-            <button
-              key={code}
-              type="button"
-              onClick={()=> setLang(code)}
-              className={`px-3 py-2 rounded-xl flex items-center gap-2 text-sm transition ${code===lang ? (isDark?'bg-white/10':'bg-slate-100') : (isDark?'hover:bg-white/10':'hover:bg-slate-100')}`}
-            >
-              <span style={{fontSize:14}}>{flags[code] || '🌐'}</span>
-              <span>{names[code] || code.toUpperCase()}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Modal({children,onClose,isDark}){
-  return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div
-        onClick={e=> e.stopPropagation()}
-        className={`w-full max-w-sm mx-auto rounded-2xl p-5 shadow-2xl ${isDark?'bg-slate-900/95 border border-white/10 text-white':'bg-white/95 border border-slate-200 text-slate-900'}`}
-      >
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function BubbleDots(){ return (<div className="absolute inset-0"><span className="absolute w-3 h-3 rounded-full bg-white/70 left-2 top-2 animate-[bubble_2.2s_ease-in-out_infinite]"/><span className="absolute w-2.5 h-2.5 rounded-full bg-white/60 right-2 top-3 animate-[bubble_2.4s_.1s_ease-in-out_infinite]"/><span className="absolute w-2 h-2 rounded-full bg-white/60 left-3 bottom-2 animate-[bubble_2s_.2s_ease-in-out_infinite]"/></div>); }
-function GooDefs(){ return (<svg width="0" height="0" style={{position:'absolute'}}><defs><filter id="goo"><feGaussianBlur in="SourceGraphic" stdDeviation="6" result="blur"/><feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -10" result="goo"/><feBlend in="SourceGraphic" in2="goo"/></filter></defs></svg>); }
-
-/* --------- Utils --------- */
-function uid(){ return Math.random().toString(36).slice(2,9)+Date.now().toString(36).slice(-4); }
-function clamp(n,a,b){ return Math.max(a, Math.min(b,n)); }
-function insertAt(arr,index,value){ const c=arr.slice(); c.splice(index,0,value); return c; }
-function randomNiceColor(){ const palette=["#60a5fa","#38bdf8","#22d3ee","#34d399","#a78bfa","#f472b6","#fbbf24","#f97316","#ef4444"]; return palette[Math.floor(Math.random()*palette.length)]; }
-export { TierListApp as App };
+        <div className={`absolute top-9 right-1 z-[80] rounded-
