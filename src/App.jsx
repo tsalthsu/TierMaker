@@ -816,35 +816,62 @@ export default function TierListApp() {
         .animate-pop { animation: pop .4s cubic-bezier(.2,1,.4,1); }
         @keyframes pop { 0% { transform: scale(.92); } 60% { transform: scale(1.06); } 100% { transform: scale(1); } }
         @keyframes sparkle {
-  0%   { transform: translate(0,0) scale(.5); opacity: 1; }
-  50%  { transform: translate(var(--dx), var(--dy)) scale(1); opacity: 1; }
+  0%   { transform: translate(0,0) scale(.6); opacity: 1; }
+  50%  { transform: translate(var(--dx), var(--dy)) scale(1.0); opacity: 1; }
   100% { transform: translate(var(--dx), var(--dy)) scale(1.2); opacity: 0; }
 }
-        .sparkle {
+        /* ✦ 금빛 별 파티클 (네모 방지: 코어(원형) + 별팔은 자식에만 필터) */
+.sparkle {
   position: fixed;
-  width: 12px;
-  height: 12px;
-  background: transparent;
+  width: 24px;
+  height: 24px;
   pointer-events: none;
+  background: transparent !important; /* 부모는 완전 투명 */
+  transform: translate(0,0) scale(.75);
   animation: sparkle 600ms ease-out forwards;
-  transform: translate(0,0) scale(.6);
-  filter:
-    drop-shadow(0 0 6px rgba(251,191,36,.95))
-    drop-shadow(0 0 14px rgba(245,158,11,.6));
+  /* 부모에는 drop-shadow를 주지 않음(네모 현상 방지) */
 }
 
-/* ✦ 십자형 별 모양 */
-.sparkle::before,
+/* 코어(원형) – 진짜 금빛 점 */
+.sparkle::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle,
+    #fff8e1 0%,
+    #fde047 45%,
+    rgba(253,224,71,.0) 65%
+  );
+  /* 글로우는 코어에만 */
+  filter:
+    drop-shadow(0 0 8px rgba(251,191,36,.95))
+    drop-shadow(0 0 18px rgba(245,158,11,.55));
+}
+/* 별빛 팔(✦) – conic-gradient + 중앙 마스크로 팔만 보이게 */
 .sparkle::after {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(to right, transparent, #facc15, transparent);
-  transform: rotate(0deg);
-}
-.sparkle::after {
-  background: linear-gradient(to bottom, transparent, #facc15, transparent);
-  transform: rotate(0deg);
+  background:
+    conic-gradient(
+      from 0deg,
+      transparent 0deg 14deg,  rgba(253,224,71,.95) 14deg 18deg,
+      transparent 18deg 72deg, rgba(253,224,71,.95) 72deg 76deg,
+      transparent 76deg 134deg,rgba(253,224,71,.95) 134deg 138deg,
+      transparent 138deg 196deg,rgba(253,224,71,.95) 196deg 200deg,
+      transparent 200deg 258deg,rgba(253,224,71,.95) 258deg 262deg,
+      transparent 262deg 320deg,rgba(253,224,71,.95) 320deg 324deg,
+      transparent 324deg 360deg
+    );
+  /* 가운데는 뚫고 팔만 보이게 */
+  -webkit-mask: radial-gradient(circle, transparent 44%, black 45%);
+  mask: radial-gradient(circle, transparent 44%, black 45%);
+  filter: blur(.4px);
 }
         @keyframes bubble { 0% { transform: translateY(0) scale(1); opacity: .8 } 50% { transform: translateY(-6px) scale(1.05); opacity: 1 } 100% { transform: translateY(0) scale(1); opacity: .8 } }
         .tier-inset-light { box-shadow: inset 0 10px 24px rgba(0,0,0,0.08), inset 0 -10px 24px rgba(0,0,0,0.06), inset 0 0 0 2px rgba(0,0,0,0.03); background: radial-gradient(120% 60% at 50% 40%, rgba(255,255,255,0.55), rgba(255,255,255,0) 70%); }
