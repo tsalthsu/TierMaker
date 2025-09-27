@@ -30,6 +30,10 @@ const ICON_OVERRIDES = {
   'Raiden': '/src/assets/头像_电弧.png', // Raiden
 };
 
+const NAME_FIX = {
+  'Raidian': '电弧', // 영어 -> 중문으로 치환
+};
+
 // PRTS 아이콘: 예외 있으면 우선, 없으면 Special:FilePath
 const prtsIcon = (cnName) => {
   if (ICON_OVERRIDES[cnName]) return ICON_OVERRIDES[cnName];
