@@ -953,8 +953,7 @@ function BlobButton({children,onClick,disabled,loading}){
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`relative inline-flex items-center justify-center px-4 py-2 rounded-2xl font-semibold text-slate-900 shadow-lg active:scale-[0.98] transition select-none ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
-      style={{background:'linear-gradient(180deg,#93c5fd,#38bdf8)', filter:'url(#goo)'}}
+      className={`ak-btn ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
     >
       <span className="relative z-10 flex items-center gap-2">
         {loading && (
@@ -963,36 +962,29 @@ function BlobButton({children,onClick,disabled,loading}){
             <path d="M21 12a9 9 0 0 1-9 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
           </svg>
         )}
-        {children}
-      </span>
-      <span className="absolute inset-0 overflow-hidden rounded-2xl">
-        <span className="absolute w-8 h-8 bg-white/50 rounded-full left-2 top-2 animate-[bubble_2.4s_ease-in-out_infinite]"/>
-        <span className="absolute w-6 h-6 bg-white/40 rounded-full right-3 top-3 animate-[bubble_2s_.2s_ease-in-out_infinite]"/>
-        <span className="absolute w-7 h-7 bg-white/40 rounded-full left-3 bottom-3 animate-[bubble_2.2s_.1s_ease-in-out_infinite]"/>
+        <span>{children}</span>
       </span>
     </button>
   );
 }
 
-/** Theme toggle (pos: 'br'|'bl') */
+/** Theme toggle (pos: 'br'|'bl') */ (pos: 'br'|'bl') */
 function ThemeToggle({isDark,onToggle,position="br"}){
   const posClass = position==="bl" ? "left-3 bottom-3" : "right-3 bottom-3";
   return (
     <button
       onClick={onToggle}
       title={isDark?'Light mode':'Dark mode'}
-      className={`fixed ${posClass} z-[60] w-10 h-10 grid place-items-center rounded-2xl border shadow-lg active:scale-95 transition ${isDark?'bg-slate-800/80 border-white/10 text-white':'bg-white border-slate-200 text-slate-900'}`}
-      style={{filter:'url(#goo)'}}
+      className={`fixed ${posClass} z-[60] ak-btn ak-btn-icon`}
     >
       {isDark? (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"></path></svg>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
       ) : (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
       )}
     </button>
   );
 }
-
 /** Hover-animated language picker (closeDelay adjustable) */
 function LangPicker({lang,setLang,langs,flags,names,isDark,open,setOpen,label,closeDelayMs=100}){
   const ref = useRef(null);
