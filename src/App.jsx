@@ -701,7 +701,7 @@ function triggerSparkles(x, y) {
               {t('loadAll')}
             </BlobButton>
             {/* PNG Export */}
-            <ExportPNG targetId="tierlist-capture" fileName="tierlist" scale={3} />
+            {/* <ExportPNG targetId="tierlist-capture" fileName="tierlist" scale={3} /> */}
 
 
             {/* Name toggle */}
