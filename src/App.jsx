@@ -1162,9 +1162,6 @@ function BlobButton({children,onClick,disabled,loading}){
         {children}
       </span>
       <span className="absolute inset-0 overflow-hidden rounded-2xl">
-        <span className="absolute w-8 h-8 bg-white/50 rounded-full left-2 top-2 animate-[bubble_2.4s_ease-in-out_infinite]"/>
-        <span className="absolute w-6 h-6 bg-white/40 rounded-full right-3 top-3 animate-[bubble_2s_.2s_ease-in-out_infinite]"/>
-        <span className="absolute w-7 h-7 bg-white/40 rounded-full left-3 bottom-3 animate-[bubble_2.2s_.1s_ease-in-out_infinite]"/>
       </span>
     </button>
   );
@@ -1259,7 +1256,7 @@ function Modal({children,onClose,isDark}){
   );
 }
 
-function BubbleDots(){ return (<div className="absolute inset-0"><span className="absolute w-3 h-3 rounded-full bg-white/70 left-2 top-2 animate-[bubble_2.2s_ease-in-out_infinite]"/><span className="absolute w-2.5 h-2.5 rounded-full bg-white/60 right-2 top-3 animate-[bubble_2.4s_.1s_ease-in-out_infinite]"/><span className="absolute w-2 h-2 rounded-full bg-white/60 left-3 bottom-2 animate-[bubble_2s_.2s_ease-in-out_infinite]"/></div>); }
+function BubbleDots(){ return (<div className="absolute inset-0"></div>); }
 function GooDefs(){ return (<svg width="0" height="0" style={{position:'absolute'}}><defs><filter id="goo"><feGaussianBlur in="SourceGraphic" stdDeviation="6" result="blur"/><feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -10" result="goo"/><feBlend in="SourceGraphic" in2="goo"/></filter></defs></svg>); }
 
 /* --------- Utils --------- */
