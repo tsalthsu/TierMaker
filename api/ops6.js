@@ -27,6 +27,7 @@ const SRC =
 // key: CN name(중문), value: 직접 링크
 const ICON_OVERRIDES = {
   '电弧': 'https://media.prts.wiki/5/56/%E5%A4%B4%E5%83%8F_%E7%94%B5%E5%BC%A7.png', // Raiden
+  'Raiden': 'https://media.prts.wiki/5/56/%E5%A4%B4%E5%83%8F_%E7%94%B5%E5%BC%A7.png', // Raiden
 };
 
 // PRTS 아이콘: 예외 있으면 우선, 없으면 Special:FilePath
