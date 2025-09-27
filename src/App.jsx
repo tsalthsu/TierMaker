@@ -674,7 +674,12 @@ function triggerSparkles(x, y) {
         <div className="mx-auto max-w-[1400px] px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
 <div className="w-9 h-9">
-  <img src="/ri-logo.webp" alt="Rhodes Island" className="w-full h-full object-contain" draggable={false}/>
+    <img
+    src={riLogo}
+    alt="Rhodes Island"
+    draggable={false}
+    className="w-full h-full object-contain"
+  />
 </div>
             <h1 className="text-xl font-semibold tracking-tight">{t('title')}</h1>
           </div>
