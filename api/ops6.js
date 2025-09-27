@@ -52,6 +52,7 @@ const EXCLUDE_SET = new Set([
   'Sharp',
   'Stormeye',
   'Touch',
+  'Tulip',
 ]);
 const isReserveOperator = (s) => /^Reserve Operator\s*-\s*/i.test(s || '');
 const isExcluded = (c) => {
