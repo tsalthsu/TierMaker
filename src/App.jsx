@@ -953,12 +953,14 @@ function triggerSparkles(x, y) {
         }
         .sweep-stroke { animation: sweep 700ms ease-out forwards; }
 
-`}
-
-        html.exporting * { box-shadow: none !important; filter: none !important; }
-        html.exporting .sparkle, html.exporting .sweep-stroke { display: none !important; } /* 효과 숨김 */
-        html.exporting .tier-inset-light, html.exporting .tier-inset-dark { display: none !important; } /* 호버 인셋 숨김 */
-</style>
+`}</style>
+<style>{`
+/* ===== Exporting mode cleanup ===== */
+html.exporting * { box-shadow: none !important; filter: none !important; }
+html.exporting .sparkle, html.exporting .sweep-stroke { display: none !important; } /* 효과 숨김 */
+html.exporting .tier-inset-light, html.exporting .tier-inset-dark { display: none !important; } /* 호버 인셋 숨김 */
+`}</style>
+      
     </div>
   );
 }
