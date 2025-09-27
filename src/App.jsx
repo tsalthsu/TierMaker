@@ -1282,3 +1282,4 @@ function starPoints(cx, cy, spikes = 5, outer = 9, inner = 4) {
 }
 
 export { TierListApp as App };
+ 
