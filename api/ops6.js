@@ -1,5 +1,5 @@
 // /api/ops6.js
-// 최신 6성 목록 + 아이콘 URL (PRTS Special:FilePath 이용 + Raiden 예외처리)
+// 6성 목록 + PRTS 아이콘 + 다국어 이름(en/ko/ja/zh) 동시 제공
 
 export const config = { runtime: 'edge' };
 
@@ -23,51 +23,58 @@ function bad(status, msg) {
 const SRC =
   'https://raw.githubusercontent.com/Kengxxiao/ArknightsGameData/master/zh_CN/gamedata/excel/character_table.json';
 
-// ----- 예외 아이콘 매핑 -----
-// key: CN name(중문), value: 직접 링크
+// ----- 예외 아이콘 (중문 키 기준) -----
 const ICON_OVERRIDES = {
-  '电弧': '/src/assets/头像_电弧.png', // Raiden
-  'Raiden': '/src/assets/头像_电弧.png', // Raiden
+  '电弧': '/src/assets/头像_电弧.png', // Raidian
 };
 
-const NAME_FIX = {
-  'Raidian': '电弧', // 영어 -> 중문으로 치환
+// ----- 간단 다국어 이름 매핑 (필요한 것부터 추가) -----
+// 키는 영어명(en) 또는 중문명(zh) 아무거나 가능. 두 개 다 넣으면 매칭률↑
+const NAME_L10N = {
+  // Raidian
+  'Raidian': { ko: '레이디언', ja: 'レイディアン', zh: '电弧' },
+  '电弧':     { ko: '레이디언', ja: 'レイディアン', zh: '电弧' },
+
+  // 몇 개 예시
+  'SilverAsh': { ko: '실버애쉬', ja: 'シルバーアッシュ', zh: '银灰' },
+  "Ch'en":     { ko: '첸',       ja: 'チェン',           zh: '陈' },
 };
 
-// PRTS 아이콘: 예외 있으면 우선, 없으면 Special:FilePath
-const prtsIcon = (cnName) => {
+// 안전 헬퍼: 영문/중문 중 하나로 찾고 zh가 없으면 중문 원본으로 보강
+function pickL10n(enName, cnName) {
+  const hit = NAME_L10N[enName] || NAME_L10N[cnName] || {};
+  return {
+    ko: hit.ko || '',
+    ja: hit.ja || '',
+    zh: hit.zh || cnName || '',
+  };
+}
+
+// PRTS 아이콘 (예외 우선, 없으면 Special:FilePath)
+function prtsIcon(cnName) {
   if (ICON_OVERRIDES[cnName]) return ICON_OVERRIDES[cnName];
-  return `https://prts.wiki/w/Special:FilePath/${encodeURIComponent('头像_' + (cnName || enName))}.png`;
-};
+  const file = `头像_${cnName || ''}.png`;
+  return `https://prts.wiki/w/Special:FilePath/${encodeURIComponent(file)}`;
+}
 
 // 6성 판별
 const isSixStar = (r) => {
-  if (typeof r === 'number') return r >= 5;
+  if (typeof r === 'number') return r >= 5;    // 0~5 → 6성은 5
   if (typeof r === 'string') return r.toUpperCase().includes('6');
   return false;
 };
 
-// ===== 예외 캐릭터 필터 =====
+// 예비/테스트/제외 캐릭터 걸러내기
 const EXCLUDE_SET = new Set([
-  'Mechanist',
-  'Misery',
-  'Outcast',
-  'Pith',
-  'Scout',
-  'Sharp',
-  'Stormeye',
-  'Touch',
-  'Tulip',
+  'Mechanist','Misery','Outcast','Pith','Scout','Sharp','Stormeye','Touch','Tulip',
 ]);
 const isReserveOperator = (s) => /^Reserve Operator\s*-\s*/i.test(s || '');
 const isExcluded = (c) => {
   const app = (c.appellation || '').trim();
   const nm = (c.name || '').trim();
   return (
-    EXCLUDE_SET.has(app) ||
-    EXCLUDE_SET.has(nm) ||
-    isReserveOperator(app) ||
-    isReserveOperator(nm)
+    EXCLUDE_SET.has(app) || EXCLUDE_SET.has(nm) ||
+    isReserveOperator(app) || isReserveOperator(nm)
   );
 };
 
@@ -80,29 +87,35 @@ export default async function handler() {
     const list = [];
     for (const [key, c] of Object.entries(data || {})) {
       if (!c || typeof c !== 'object') continue;
+
+      // 토큰류 제외
       const prof = (c.profession || '').toUpperCase();
       if (prof === 'TOKEN') continue;
 
+      // 6성 + 제외 목록 필터링
       if (!isSixStar(c.rarity)) continue;
       if (isExcluded(c)) continue;
 
-      const nameCN = c.name || c.appellation || key;
-      const label =
-        c.appellation && String(c.appellation).trim().length > 0
-          ? c.appellation
-          : nameCN;
+      // 이름 기본값
+      const cnName = c.name || c.appellation || key;               // 중국어(원본)
+      const enName = (c.appellation && String(c.appellation).trim()) || key; // 영어
+      const l10n = pickL10n(enName, cnName);
 
+      // 프런트(App.jsx)가 label로 정렬/표시 폴백하므로 en을 label에도 넣어줌
       list.push({
-  id: key,
-  en: c.appellation || key,   // 영어 이름
-  ko: NAME_FIX[c.appellation] || '', // 필요하면 한국어 직접 매핑
-  ja: '', // 일본어도 필요 시 추가
-  zh: nameCN,                 // 중국어 이름
-  image: '/api/img?url=' + encodeURIComponent(prtsIcon(nameCN)),
-});
+        id: key,
+        label: enName,                           // ← 정렬 안정화용
+        en: enName,
+        ko: l10n.ko,
+        ja: l10n.ja,
+        zh: l10n.zh,
+        image: '/api/img?url=' + encodeURIComponent(prtsIcon(cnName)),
+      });
     }
 
-    list.sort((a, b) => a.label.localeCompare(b.label, 'en'));
+    // 영어 기준 정렬
+    list.sort((a, b) => String(a.label).localeCompare(String(b.label), 'en'));
+
     return ok(list, 3600);
   } catch (e) {
     return bad(500, 'ops6: ' + (e?.message || 'unknown error'));
