@@ -201,6 +201,9 @@ export default function TierListApp() {
   const [justPoppedId, setJustPoppedId] = useState(null);
   const [sparkles, setSparkles] = useState([]);
   const [sweeps, setSweeps] = useState([]);
+  const addSweep = React.useCallback((left, top, w, h, radius = 12) => {
+    setSweeps(prev => [...prev, { id: uid(), x: left, y: top, w, h, r: radius, createdAt: Date.now() }]);
+  }, []);
   useEffect(() => {
   const t = setInterval(() => {
     setSparkles(prev => prev.filter(s => Date.now() - s.createdAt < (s.life || 1100)));
