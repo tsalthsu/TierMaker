@@ -888,21 +888,52 @@ export default function TierListApp() {
 /* --------- Components --------- */
 
 function DraggableItem({ item, onDragStart, justPopped, index, isDark, onRename, onDelete, isDragging, showNames, name }){
-  const ref = useRef(null);
-  const [open,setOpen] = useState(false);
-  useEffect(()=>{ const onDoc=e=>{ if(ref.current && !ref.current.contains(e.target)) setOpen(false); }; const onKey=e=>{ if(e.key==='Escape') setOpen(false); }; document.addEventListener('click',onDoc); document.addEventListener('keydown',onKey); return ()=>{ document.removeEventListener('click',onDoc); document.removeEventListener('keydown',onKey); }; },[]);
+const ref = useRef(null);
+const [open,setOpen] = useState(false);
+useEffect(()=>{
+const onDoc=e=>{ if(ref.current && !ref.current.contains(e.target)) setOpen(false); };
+const onKey=e=>{ if(e.key==='Escape') setOpen(false); };
+document.addEventListener('click',onDoc);
+document.addEventListener('keydown',onKey);
+return ()=>{
+document.removeEventListener('click',onDoc);
+document.removeEventListener('keydown',onKey);
+};
+},[]);
 
-  const square = !showNames;
 
-  return (
-    <div
-      ref={ref}
-      data-role="card"
-      data-id={item.id}
-      onContextMenu={e=>{ e.preventDefault(); setOpen(true); }}
-      draggable
-      onDragStart={e=>{ onDragStart && onDragStart(e); const r=ref.current?.getBoundingClientRect(); if(r){ e.currentTarget.style.setProperty('--mx', `${e.clientX-r.left}px`); e.currentTarget.style.setProperty('--my', `${e.clientY-r.top}px`);} }}
-      className={`item-card ${square?'square':''} group select-none border shadow-lg hover:-translate-y-0.5 transition transform ${justPopped?'animate-pop':''} ${isDark?'bg-slate-800/80 border-white/10':'bg-white/90 border-slate-200'} ${isDragging?'opacity-50':''}`}
-    >
-      {open && (
-        <div className={`absolute top-9 right-1 z-[80] rounded-
+const square = !showNames;
+
+
+return (
+<div
+ref={ref}
+data-role="card"
+data-id={item.id}
+onContextMenu={e=>{ e.preventDefault(); setOpen(true); }}
+draggable
+onDragStart={e=>{
+onDragStart && onDragStart(e);
+const r=ref.current?.getBoundingClientRect();
+if(r){
+e.currentTarget.style.setProperty('--mx', `${e.clientX-r.left}px`);
+e.currentTarget.style.setProperty('--my', `${e.clientY-r.top}px`);
+}
+}}
+className={`item-card ${square?'square':''} group select-none border shadow-lg hover:-translate-y-0.5 transition transform ${justPopped?'animate-pop':''} ${isDark?'bg-slate-800/80 border-white/10':'bg-white/90 border-slate-200'} ${isDragging?'opacity-50':''}`}
+>
+{open && (
+<div className={`absolute top-9 right-1 z-[80] rounded-xl border p-2 w-40 bg-white shadow-xl ${isDark?'bg-slate-800 text-white':'text-slate-900'}`}>
+<button onClick={()=> onRename && onRename(prompt('Rename to?', name) || name)} className="block w-full text-left px-2 py-1 hover:bg-slate-200">Rename</button>
+<button onClick={()=> onDelete && onDelete()} className="block w-full text-left px-2 py-1 hover:bg-slate-200 text-rose-500">Delete</button>
+</div>
+)}
+
+
+<div className="item-img"><img src={item.image} alt={item.label} className="img-el"/></div>
+{showNames && (
+<div className={`item-name ${isDark?'bg-slate-700/80 text-white':'bg-slate-100 text-slate-900'}`}>{name}</div>
+)}
+</div>
+);
+}
