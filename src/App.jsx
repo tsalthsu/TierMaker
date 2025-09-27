@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react"; 
 import ExportPNG from "./components/ExportPNG";
 /* @vite-ignore */
-// Arknights Tier – Clean (Save 10: Multi-load 4/5/6/All + confirm modals)
+// Tier List (Save 10: Multi-load 4/5/6/All + confirm modals)
 // - Header: 4★/5★/6★/All buttons (in that order)
 // - Each shows a confirm modal before loading
 // - Fetch tries /api/ops?star=X then falls back to /api/opsX
@@ -31,7 +31,7 @@ export default function TierListApp() {
 
   const MSG = {
     en: {
-      title: 'Arknights Tier – Clean',
+      title: 'Tier List',
       addTier: 'Add Tier',
       reset: 'Reset',
       load4: 'Load 4★',
@@ -66,7 +66,7 @@ export default function TierListApp() {
       fileSelect: 'Choose files',
     },
     ko: {
-      title: 'Arknights Tier – Clean',
+      title: 'Tier List',
       addTier: '티어 추가',
       reset: '초기화',
       load4: '4성 불러오기',
@@ -101,7 +101,7 @@ export default function TierListApp() {
       fileSelect: '파일 선택(복수)',
     },
     ja: {
-      title: 'Arknights Tier – Clean',
+      title: 'Tier List',
       addTier: 'ティア追加',
       reset: 'リセット',
       load4: '★4を読み込む',
@@ -134,7 +134,7 @@ export default function TierListApp() {
       fileSelect: 'ファイルを選択(複数)',
     },
     zh: {
-      title: 'Arknights Tier – Clean',
+      title: 'Tier List',
       addTier: '添加层级',
       reset: '重置',
       load4: '导入4★',
