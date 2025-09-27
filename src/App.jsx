@@ -187,7 +187,8 @@ export default function TierListApp() {
     { name: 'C', color: '#f97316', items: [] },
     { name: 'D', color: '#ef4444', items: [] },
   ]);
-// keep refs size in sync with tiers length
+
+  // keep refs size in sync with tiers length
   const tierContainerRefs = useRef({});
   useEffect(() => {
     const next = {};
@@ -200,33 +201,9 @@ export default function TierListApp() {
   const [justPoppedId, setJustPoppedId] = useState(null);
   const [sparkles, setSparkles] = useState([]);
   const [sweeps, setSweeps] = useState([]);
-    const triggerPerimeterSparkles = React.useCallback((rect) => {
-    const id = uid();
-    const { left, top, width: w, height: h } = rect;
-    const perimeter = 2 * (w + h);
-    const N = Math.max(24, Math.round(perimeter * 0.12));
-    const items = [];
-    for (let i = 0; i < N; i++) {
-      const t = i / N;
-      let px, py, nx, ny;
-      const d = t * perimeter;
-      if (d < w) { px = left + d; py = top; nx = 0; ny = -1; }
-      else if (d < w + h) { px = left + w; py = top + (d - w); nx = 1; ny = 0; }
-      else if (d < 2*w + h) { px = left + (2*w + h - d); py = top + h; nx = 0; ny = 1; }
-      else { px = left; py = top + (perimeter - d); nx = -1; ny = 0; }
-      const a = Math.atan2(ny, nx) + (Math.random() * 0.8 - 0.4);
-      const dist = 14 + Math.random() * 34;
-      items.push({ id: `${id}-pd-${i}`, layer: "back", type: "dust", x: px, y: py, angle: a, dist,
-        size: 1.6 + Math.random()*2.2, life: 900 + Math.random()*280, createdAt: Date.now(), delay: Math.floor(Math.random()*140) });
-    }
-    setSparkles(prev => [...prev, ...items]);
+  const addSweep = React.useCallback((left, top, w, h, radius = 12) => {
+    setSweeps(prev => [...prev, { id: uid(), x: left, y: top, w, h, r: radius, createdAt: Date.now() }]);
   }, []);
-const addSweep = React.useCallback((left, top, w, h, radius=12) => {
-    setSweeps(prev => [...prev, { id: uid(), x:left, y:top, w, h, r: radius, createdAt: Date.now() }]);
-  }, []);
-  
-  
-  
   useEffect(() => {
   const t = setInterval(() => {
     setSparkles(prev => prev.filter(s => Date.now() - s.createdAt < (s.life || 1100)));
@@ -368,10 +345,10 @@ const addSweep = React.useCallback((left, top, w, h, radius=12) => {
       const cx = r.left + r.width / 2;
       const cy = r.top + r.height / 2;
       addSweep(r.left, r.top, r.width, r.height, 12);
-      triggerPerimeterSparkles(r);
+      triggerSparkles(cx, cy);
     } else {
       // 혹시 못 찾았을 때는 임시로 마우스 좌표
-      (() => { const r = { left: e.clientX-40, top: e.clientY-60, width: 80, height: 120 }; triggerPerimeterSparkles(r); })();
+      triggerSparkles(e.clientX, e.clientY);
     }
   });
   setTimeout(() => setJustPoppedId(null), 450);
@@ -456,7 +433,47 @@ const addSweep = React.useCallback((left, top, w, h, radius=12) => {
     return p.x >= r.left - margin && p.x <= r.right + margin && p.y >= r.top - margin && p.y <= r.bottom + margin;
   };
 
-/* triggerSparkles disabled */
+function triggerSparkles(x, y) {
+  const id = uid();
+
+  // --- BACK layer (behind cards): dense ring + dust + big flare ---
+  const ringN = 36;
+  const dustN = 60;
+
+  const backRing = Array.from({ length: ringN }).map((_, i) => {
+    const a = (Math.PI * 2 * i) / ringN + (Math.random() * 0.3 - 0.15);
+    const dist = 70 + Math.random() * 30; // larger radius
+    return { id: `${id}-br-${i}`, layer: 'back', type: 'dust', x, y, angle: a, dist,
+      size: 2 + Math.random()*2, life: 1000 + Math.random()*250, createdAt: Date.now(), delay: Math.floor(Math.random()*120) };
+  });
+
+  const backDust = Array.from({ length: dustN }).map((_, i) => {
+    const a = Math.random() * Math.PI * 2;
+    const dist = 40 + Math.random() * 60;
+    return { id: `${id}-bd-${i}`, layer: 'back', type: 'dust', x, y, angle: a, dist,
+      size: 1.6 + Math.random()*2.4, life: 900 + Math.random()*280, createdAt: Date.now(), delay: Math.floor(Math.random()*160) };
+  });
+
+  const backFlare = {
+    id: `${id}-bf-0`, layer: 'back', type: 'flare', x, y,
+    angle: Math.random()*Math.PI*2, dist: 60 + Math.random()*20,
+    size: 18 + Math.random()*6, rotate: (Math.random()*20-10), power: 1,
+    life: 1400 + Math.random()*260, createdAt: Date.now(), delay: 30 + Math.floor(Math.random()*90)
+  };
+
+  // --- FRONT layer (accent): optional small flare ---
+  const frontFlare = Math.random()<0.6 ? [{
+    id: `${id}-ff-0`, layer: 'front', type: 'flare', x, y,
+    angle: Math.random()*Math.PI*2, dist: 45 + Math.random()*14,
+    size: 10 + Math.random()*4, rotate: (Math.random()*16-8),
+    life: 1100 + Math.random()*220, createdAt: Date.now(), delay: 80 + Math.floor(Math.random()*120)
+  }] : [];
+
+  setSparkles(prev => [...prev, ...backRing, ...backDust, backFlare, ...frontFlare]);
+}
+
+
+
   const [editingTierIndex,setEditingTierIndex]=useState(null);
   const [editingTierValue,setEditingTierValue]=useState('');
   function startEditTier(i){ setEditingTierIndex(i); setEditingTierValue(tiers[i].name); }
@@ -791,19 +808,19 @@ const addSweep = React.useCallback((left, top, w, h, radius=12) => {
                       });
                     }
                   }}
-                  onDragLeave={() => { 
+                  onDragLeave={()=> { 
                     const c = tierContainerRefs.current[idx];
                     const r = c?.getBoundingClientRect();
                     const m = 16;
                     const p = lastPosRef.current;
                     const inside = !!(r && p && p.x >= r.left - m && p.x <= r.right + m && p.y >= r.top - m && p.y <= r.bottom + m);
-                    if (!inside) {
-                      if (hoverTierIndex === idx) setHoverTierIndex(null);
+                    if(!inside){
+                      if(hoverTierIndex===idx) setHoverTierIndex(null);
                       setHoverInsertIndex(null);
-                      cachedRectsRef.current[idx] = null;
-                      if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
-                      pendingPosRef.current = null;
-                      lastPosRef.current = null;
+                      cachedRectsRef.current[idx]=null;
+                      if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current=null; }
+                      pendingPosRef.current=null;
+                      lastPosRef.current=null;
                     }
                   }}
                   onDrop={e=>{ if(hoverTierIndex===idx) setHoverTierIndex(null); setHoverInsertIndex(null); cachedRectsRef.current[idx]=null; if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current=null; } pendingPosRef.current=null; lastPosRef.current=null; onDropToTier(e,idx); }}
@@ -953,7 +970,9 @@ function SweepGlow({ x, y, w, h, r }) {
     </svg>
   );
 }
-  );
+
+function addSweep(left, top, w, h, radius=12){
+  setSweeps(prev => [...prev, { id: uid(), x:left, y:top, w, h, r: radius, createdAt: Date.now() }]);
 }
 
 
