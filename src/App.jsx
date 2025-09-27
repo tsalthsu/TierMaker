@@ -926,10 +926,17 @@ function triggerSparkles(x, y) {
         .toast[data-life="short"] { animation-delay: 0s, 2.3s; }
         @keyframes toastIn { from { transform: translateY(-6px); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
         @keyframes toastOut { to { transform: translateY(-6px); opacity: 0 } }
-      `}
+
         /* Sweep stroke animation */
-        @keyframes sweep { from { stroke-dashoffset: 0; opacity: 0 } 10% { opacity: 1 } 80% { opacity: 1 } to { stroke-dashoffset: -100%; opacity: 0 } }
+        @keyframes sweep {
+          from { stroke-dashoffset: 0; opacity: 0; }
+          10%  { opacity: 1; }
+          80%  { opacity: 1; }
+          to   { stroke-dashoffset: -100%; opacity: 0; }
+        }
         .sweep-stroke { animation: sweep 700ms ease-out forwards; }
+
+`}
 </style>
     </div>
   );
@@ -1282,4 +1289,3 @@ function starPoints(cx, cy, spikes = 5, outer = 9, inner = 4) {
 }
 
 export { TierListApp as App };
- 
