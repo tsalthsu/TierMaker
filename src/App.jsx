@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react"; 
 import ExportPNG from "./components/ExportPNG";
+import riLogo from "./assets/ri-logo.webp";
 /* @vite-ignore */
 // Tier List (Save 10: Multi-load 4/5/6/All + confirm modals)
 // - Header: 4★/5★/6★/All buttons (in that order)
@@ -672,7 +673,14 @@ function triggerSparkles(x, y) {
       <header className={`sticky top-0 z-30 backdrop-blur border-b ${isDark?'bg-slate-900/50 border-white/10':'bg-white/70 border-slate-200/70'}`} data-export-hide="true">
         <div className="mx-auto max-w-[1400px] px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-2xl shadow-lg relative overflow-hidden" style={{filter:'url(#goo)', background:isDark?'#3b82f6':'#60a5fa'}}><BubbleDots/></div>
+            <div className="w-9 h-9 rounded-2xl shadow-lg overflow-hidden bg-transparent">
+  <img
+    src={riLogo}
+    alt="Rhodes Island"
+    draggable={false}
+    className="w-full h-full object-contain"
+  />
+</div>
             <h1 className="text-xl font-semibold tracking-tight">{t('title')}</h1>
           </div>
           <div className="flex items-center gap-2 md:gap-3">
