@@ -345,10 +345,10 @@ export default function TierListApp() {
       const cx = r.left + r.width / 2;
       const cy = r.top + r.height / 2;
       addSweep(r.left, r.top, r.width, r.height, 12);
-      triggerSparkles(cx, cy);
+      triggerPerimeterSparkles(r);
     } else {
       // 혹시 못 찾았을 때는 임시로 마우스 좌표
-      triggerSparkles(e.clientX, e.clientY);
+      (() => { const r = { left: e.clientX-40, top: e.clientY-60, width: 80, height: 120 }; triggerPerimeterSparkles(r); })();
     }
   });
   setTimeout(() => setJustPoppedId(null), 450);
@@ -433,47 +433,7 @@ export default function TierListApp() {
     return p.x >= r.left - margin && p.x <= r.right + margin && p.y >= r.top - margin && p.y <= r.bottom + margin;
   };
 
-function triggerSparkles(x, y) {
-  const id = uid();
-
-  // --- BACK layer (behind cards): dense ring + dust + big flare ---
-  const ringN = 36;
-  const dustN = 60;
-
-  const backRing = Array.from({ length: ringN }).map((_, i) => {
-    const a = (Math.PI * 2 * i) / ringN + (Math.random() * 0.3 - 0.15);
-    const dist = 70 + Math.random() * 30; // larger radius
-    return { id: `${id}-br-${i}`, layer: 'back', type: 'dust', x, y, angle: a, dist,
-      size: 2 + Math.random()*2, life: 1000 + Math.random()*250, createdAt: Date.now(), delay: Math.floor(Math.random()*120) };
-  });
-
-  const backDust = Array.from({ length: dustN }).map((_, i) => {
-    const a = Math.random() * Math.PI * 2;
-    const dist = 40 + Math.random() * 60;
-    return { id: `${id}-bd-${i}`, layer: 'back', type: 'dust', x, y, angle: a, dist,
-      size: 1.6 + Math.random()*2.4, life: 900 + Math.random()*280, createdAt: Date.now(), delay: Math.floor(Math.random()*160) };
-  });
-
-  const backFlare = {
-    id: `${id}-bf-0`, layer: 'back', type: 'flare', x, y,
-    angle: Math.random()*Math.PI*2, dist: 60 + Math.random()*20,
-    size: 18 + Math.random()*6, rotate: (Math.random()*20-10), power: 1,
-    life: 1400 + Math.random()*260, createdAt: Date.now(), delay: 30 + Math.floor(Math.random()*90)
-  };
-
-  // --- FRONT layer (accent): optional small flare ---
-  const frontFlare = Math.random()<0.6 ? [{
-    id: `${id}-ff-0`, layer: 'front', type: 'flare', x, y,
-    angle: Math.random()*Math.PI*2, dist: 45 + Math.random()*14,
-    size: 10 + Math.random()*4, rotate: (Math.random()*16-8),
-    life: 1100 + Math.random()*220, createdAt: Date.now(), delay: 80 + Math.floor(Math.random()*120)
-  }] : [];
-
-  setSparkles(prev => [...prev, ...backRing, ...backDust, backFlare, ...frontFlare]);
-}
-
-
-
+function triggerSparkles(){ /* disabled: replaced by triggerPerimeterSparkles */ }
   const [editingTierIndex,setEditingTierIndex]=useState(null);
   const [editingTierValue,setEditingTierValue]=useState('');
   function startEditTier(i){ setEditingTierIndex(i); setEditingTierValue(tiers[i].name); }
@@ -947,13 +907,55 @@ function triggerSparkles(x, y) {
   );
 }
 
+
+function triggerPerimeterSparkles(rect) {
+  const id = uid();
+  const { left, top, width: w, height: h } = rect;
+  const perimeter = 2 * (w + h);
+  const N = Math.max(24, Math.round(perimeter * 0.12)); // density along edge
+  const items = [];
+
+  for (let i = 0; i < N; i++) {
+    const t = i / N; // 0..1 along the rectangle perimeter, clockwise
+    let px, py, nx, ny;
+    const d = t * perimeter;
+    if (d < w) { // top edge (left→right)
+      px = left + d; py = top; nx = 0; ny = -1;
+    } else if (d < w + h) { // right edge (top→bottom)
+      px = left + w; py = top + (d - w); nx = 1; ny = 0;
+    } else if (d < 2*w + h) { // bottom edge (right→left)
+      px = left + (2*w + h - d); py = top + h; nx = 0; ny = 1;
+    } else { // left edge (bottom→top)
+      px = left; py = top + (perimeter - d); nx = -1; ny = 0;
+    }
+
+    // outward-biased direction with jitter
+    const a = Math.atan2(ny, nx) + (Math.random() * 0.8 - 0.4);
+    const dist = 14 + Math.random() * 34; // spread from the edge
+
+    items.push({
+      id: `${id}-pd-${i}`,
+      layer: 'back',
+      type: 'dust',
+      x: px, y: py, angle: a, dist,
+      size: 1.6 + Math.random()*2.2,
+      life: 900 + Math.random()*280,
+      createdAt: Date.now(),
+      delay: Math.floor(Math.random()*140)
+    });
+  }
+
+  setSparkles(prev => [...prev, ...items]);
+}
+
+
 /* --------- Components --------- */
 
 function SweepGlow({ x, y, w, h, r }) {
   const id = React.useMemo(() => uid(), []);
   const len = (w + h) * 2;
   return (
-    <svg className="fixed pointer-events-none" style={{ left: x, top: y, width: w, height: h }} viewBox={`0 0 ${w} ${h}`} aria-hidden>
+    <svg className="fixed pointer-events-none" style={{ left: x, top: y, width: w, height: h, overflow: 'visible' }} viewBox={`0 0 ${w} ${h}`} aria-hidden>
       <defs>
         <linearGradient id={`lg-${id}`} x1="0" y1="0" x2="1" y2="0">
           <stop offset="0%" stopColor="#fff8e1" stopOpacity="0"/>
