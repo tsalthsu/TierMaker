@@ -523,7 +523,7 @@ function triggerSparkles(x, y) {
       if (star === 'all') {
         tryEndpoints.push('/api/ops?star=all', '/api/opsAll');
       } else {
-        tryEndpoints.push(`/api/ops?star=${star}`, `/api/ops${star}`);
+        tryEndpoints.push(`/api/ops${star}`, `/api/ops?star=${star}`);
       }
 
       let raw = null, ok = false;
