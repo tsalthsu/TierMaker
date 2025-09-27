@@ -63,6 +63,7 @@ export default function TierListApp() {
       star5: '5★',
       star6: '6★',
       starAll: 'All',
+      fileSelect: 'Choose files',
     },
     ko: {
       title: 'Arknights Tier – Clean',
@@ -97,6 +98,7 @@ export default function TierListApp() {
       star5: '5성',
       star6: '6성',
       starAll: '전체',
+      fileSelect: '파일 선택(복수)',
     },
     ja: {
       title: 'Arknights Tier – Clean',
@@ -129,6 +131,7 @@ export default function TierListApp() {
       star5: '★5',
       star6: '★6',
       starAll: '全て',
+      fileSelect: 'ファイルを選択(複数)',
     },
     zh: {
       title: 'Arknights Tier – Clean',
@@ -161,6 +164,7 @@ export default function TierListApp() {
       star5: '5★',
       star6: '6★',
       starAll: '全部',
+      fileSelect: '选择文件(多个)',
     }
   };
   const t = (k)=> (MSG[lang] && MSG[lang][k]) || MSG.en[k] || k;
@@ -728,7 +732,8 @@ function triggerSparkles(x, y) {
             onDrop={e=>{ e.preventDefault(); const files=[...e.dataTransfer.files].filter(f=>f.type.startsWith('image/')); if(files.length) addFilesAsItems(files); }}
           >
             <div className="flex flex-wrap gap-3 items-center">
-              <label className={`cursor-pointer inline-flex items-center gap-2 px-3 py-2 rounded border transition ${isDark?'bg-white/10 border-white/10 hover:bg-white/15':'bg-slate-50 border-slate-200 hover:bg-slate-100'}`}>파일 선택(복수)
+              <label className={`cursor-pointer inline-flex items-center gap-2 px-3 py-2 rounded border transition ${isDark?'bg-white/10 border-white/10 hover:bg-white/15':'bg-slate-50 border-slate-200 hover:bg-slate-100'}`}>  
+                {t('fileSelect')}
                 <input type="file" accept="image/*" multiple className="hidden" onChange={onSelectFiles}/>
               </label>
               <div className="grow"/>
