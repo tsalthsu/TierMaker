@@ -799,16 +799,16 @@ function triggerSparkles(x, y) {
                     ) : (
                       <button onClick={()=> startEditTier(idx)} title="Edit tier name" className="w-full h-full">{tier.name}</button>
                     )}
-                       {/* ▲▼ 이동 버튼 */}
-  <div className="absolute -right-10 top-1/2 -translate-y-1/2 flex flex-col gap-1" data-export-hide="true">
-    <button onClick={()=> moveTier(idx, idx-1)}
-            className="px-2 py-1 rounded border text-xs bg-white/70 hover:bg-white shadow">
-      ▲
-    </button>
-    <button onClick={()=> moveTier(idx, idx+1)}
-            className="px-2 py-1 rounded border text-xs bg-white/70 hover:bg-white shadow">
-      ▼
-    </button>
+  {/* ▲▼ 이동 버튼을 레이블 안쪽 하단에 붙이기 */}
+  <div className="absolute bottom-1 right-1 flex flex-col gap-1" data-export-hide="true">
+    <button
+      onClick={()=> moveTier(idx, idx-1)}
+      className="w-6 h-6 rounded border bg-white/70 hover:bg-white text-xs shadow flex items-center justify-center"
+    >▲</button>
+    <button
+      onClick={()=> moveTier(idx, idx+1)}
+      className="w-6 h-6 rounded border bg-white/70 hover:bg-white text-xs shadow flex items-center justify-center"
+    >▼</button>
   </div>
                     
                     {openTierMenu===idx && (
