@@ -200,12 +200,14 @@ export default function TierListApp() {
   const [dragData, setDragData] = useState(null);
   const [justPoppedId, setJustPoppedId] = useState(null);
   const [sparkles, setSparkles] = useState([]);
-  useEffect(()=>{
-  const tmr = setInterval(()=>{
+  const [sweeps, setSweeps] = useState([]);
+  useEffect(() => {
+  const t = setInterval(() => {
     setSparkles(prev => prev.filter(s => Date.now() - s.createdAt < (s.life || 1100)));
+    setSweeps(prev => prev.filter(sw => Date.now() - sw.createdAt < 900));
   }, 200);
-  return ()=> clearInterval(tmr);
-},[]);
+  return () => clearInterval(t);
+}, []);
   const overlayRef = useRef(null);
   const cachedRectsRef = useRef({});
   const rafRef = useRef(null);
