@@ -1,311 +1,321 @@
-import React, { useEffect, useMemo, useRef, useState } from "react"; 
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import ExportPNG from "./components/ExportPNG";
-/* @vite-ignore */
-// Arknights Tier – Clean (Save 10: Multi-load 4/5/6/All + confirm modals)
-// - Header: 4★/5★/6★/All buttons (in that order)
-// - Each shows a confirm modal before loading
-// - Fetch tries /api/ops?star=X then falls back to /api/opsX
-// - i18n, theme bottom-left, name on/off, toast, row-based DnD maintained
 
-export default function TierListApp() {
-  // ---------- Theme ----------
-  const [theme, setTheme] = useState(() => localStorage.getItem('clean-tier-theme') || 'light');
-  useEffect(() => { localStorage.setItem('clean-tier-theme', theme); }, [theme]);
-  const isDark = theme === 'dark';
+/* =============================================================
+   GooDefs (gooey filter used by header blob icon)
+   ============================================================= */
+function GooDefs(){
+  return (
+    <svg width="0" height="0" style={{position:'absolute'}} aria-hidden>
+      <defs>
+        <filter id="goo">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="blur"/>
+          <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -10" result="goo"/>
+          <feBlend in="SourceGraphic" in2="goo"/>
+        </filter>
+      </defs>
+    </svg>
+  );
+}
 
-  // ---------- i18n ----------
-  const LANGS = ['en','ko','ja','zh'];
-  const FLAGS = { en:'🇺🇸', ko:'🇰🇷', ja:'🇯🇵', zh:'🇨🇳' };
-  const NAMES = { en:'English', ko:'한국어', ja:'日本語', zh:'中文' };
+/* =============================================================
+   Utility helpers
+   ============================================================= */
+function uid(){ return Math.random().toString(36).slice(2,9)+Date.now().toString(36).slice(-4); }
+const clamp = (v,min,max)=> Math.min(max, Math.max(min, v));
+const insertAt = (arr, idx, val)=>{ const a=arr.slice(); a.splice(clamp(idx,0,a.length),0,val); return a; };
+function randomNiceColor(){
+  const c = [
+    "#60a5fa","#34d399","#fbbf24","#f97316","#ef4444","#a78bfa","#22d3ee","#f472b6"
+  ];
+  return c[Math.floor(Math.random()*c.length)];
+}
 
-  const [lang, setLang] = useState(() => {
-    const saved = localStorage.getItem('clean-tier-lang');
-    if (saved && LANGS.includes(saved)) return saved;
-    const nav = (navigator.language || navigator.userLanguage || 'en').toLowerCase();
-    if (nav.startsWith('ko')) return 'ko';
-    if (nav.startsWith('ja')) return 'ja';
-    if (nav.startsWith('zh')) return 'zh';
+/* =============================================================
+   i18n
+   ============================================================= */
+const LANGS = ['en','ko','ja','zh'];
+const FLAGS = { en:'🇺🇸', ko:'🇰🇷', ja:'🇯🇵', zh:'🇨🇳' };
+const NAMES = { en:'English', ko:'한국어', ja:'日本語', zh:'中文' };
+const MSG = {
+  en: {
+    title: 'Arknights Tier – Clean',
+    addTier: 'Add Tier',
+    reset: 'Reset',
+    load4: 'Load 4★',
+    load5: 'Load 5★',
+    load6: 'Load 6★',
+    loadAll: 'Load All',
+    loading: 'Loading…',
+    inputLabel: 'Label (optional)',
+    inputImg: 'Image URL (optional)',
+    addSingle: 'Add One',
+    dragHere: 'Drag items here to place.',
+    confirmResetTitle: 'Revert to initial state',
+    confirmResetDesc: 'This clears all tiers and returns items to the pool.',
+    cancel: 'Cancel',
+    resetGo: 'Reset',
+    confirmLoadTitle: 'Load {star}',
+    confirmLoadDesc: 'Do you want to import {star} operators?',
+    confirmYes: 'Load',
+    toastOpsSuccess: 'Loaded {n} {star}.',
+    toastOpsNoEntries: 'No entries from the API.',
+    toastOpsNoneToAdd: 'Nothing to add.',
+    toastOpsFail: 'Load failed.',
+    nameShow: 'Show Names',
+    nameHide: 'Hide Names',
+    langTitle: 'Language',
+    star4: '4★', star5: '5★', star6: '6★', starAll: 'All',
+  },
+  ko: {
+    title: 'Arknights Tier – Clean',
+    addTier: '티어 추가',
+    reset: '초기화',
+    load4: '4성 불러오기',
+    load5: '5성 불러오기',
+    load6: '6성 불러오기',
+    loadAll: '전체 불러오기',
+    loading: '불러오는 중…',
+    inputLabel: '라벨 (선택)',
+    inputImg: '이미지 URL (선택)',
+    addSingle: '단일 추가',
+    dragHere: '여기로 드래그해서 배치하세요.',
+    confirmResetTitle: '초기 상태로 되돌립니다',
+    confirmResetDesc: '모든 티어 배치를 비우고 풀로 되돌립니다.',
+    cancel: '취소',
+    resetGo: '초기화',
+    confirmLoadTitle: '{star} 불러오기',
+    confirmLoadDesc: '{star} 오퍼레이터를 불러오겠습니까?',
+    confirmYes: '불러오기',
+    toastOpsSuccess: '{star} {n}개 불러왔습니다.',
+    toastOpsNoEntries: 'API에서 불러올 항목이 없습니다.',
+    toastOpsNoneToAdd: '추가할 항목이 없습니다.',
+    toastOpsFail: '불러오기에 실패했습니다.',
+    nameShow: '이름 표시',
+    nameHide: '이름 숨기기',
+    langTitle: '언어',
+    star4: '4성', star5: '5성', star6: '6성', starAll: '전체',
+  },
+  ja: {
+    title: 'Arknights Tier – Clean',
+    addTier: 'ティア追加',
+    reset: 'リセット',
+    load4: '★4を読み込む',
+    load5: '★5を読み込む',
+    load6: '★6を読み込む',
+    loadAll: '全て読み込む',
+    loading: '読み込み中…',
+    inputLabel: 'ラベル（任意）',
+    inputImg: '画像URL（任意）',
+    addSingle: '1件追加',
+    dragHere: 'ここにドラッグして配置します。',
+    confirmResetTitle: '初期状態に戻します',
+    confirmResetDesc: '全てのティアをクリアし、プールに戻します。',
+    cancel: 'キャンセル',
+    resetGo: 'リセット',
+    confirmLoadTitle: '{star}の読み込み',
+    confirmLoadDesc: '{star}オペレーターを読み込みますか？',
+    confirmYes: '読み込む',
+    toastOpsSuccess: '{star}を{n}件読み込みました。',
+    toastOpsNoEntries: 'APIから読み込む項目がありません。',
+    toastOpsNoneToAdd: '追加する項目はありません。',
+    toastOpsFail: '読み込みに失敗しました。',
+    nameShow: '名前表示', nameHide: '名前非表示', langTitle: '言語',
+    star4: '★4', star5: '★5', star6: '★6', starAll: '全て',
+  },
+  zh: {
+    title: 'Arknights Tier – Clean', addTier: '添加层级', reset: '重置',
+    load4: '导入4★', load5: '导入5★', load6: '导入6★', loadAll: '全部导入',
+    loading: '加载中…', inputLabel: '标签（可选）', inputImg: '图片URL（可选）', addSingle: '添加一项',
+    dragHere: '拖拽到此处进行放置。', confirmResetTitle: '恢复到初始状态', confirmResetDesc: '清空所有层级并将项目放回池中。',
+    cancel: '取消', resetGo: '重置', confirmLoadTitle: '导入{star}', confirmLoadDesc: '要导入{star}干员吗？', confirmYes: '导入',
+    toastOpsSuccess: '已导入 {n} 个{star}。', toastOpsNoEntries: 'API 未返回可导入的项目。', toastOpsNoneToAdd: '没有可添加的项目。', toastOpsFail: '导入失败。',
+    nameShow: '显示名称', nameHide: '隐藏名称', langTitle: '语言', star4: '4★', star5: '5★', star6: '6★', starAll: '全部',
+  }
+};
+
+/* =============================================================
+   Minor UI bits (buttons, modal, toast, language picker, header icon)
+   ============================================================= */
+function BlobButton({ children, onClick, disabled }){
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`px-3 py-2 rounded-xl text-sm shadow-md border disabled:opacity-60 ${disabled? 'cursor-not-allowed':''} bg-white border-slate-200 hover:bg-slate-50`}
+    >{children}</button>
+  );
+}
+
+function ThemeToggle({ isDark, onToggle, position='bl' }){
+  const pos = position==='bl' ? 'left-4 bottom-4' : 'right-4 bottom-4';
+  return (
+    <button onClick={onToggle} className={`fixed ${pos} z-[80] px-3 py-2 rounded-xl border ${isDark?'bg-white/10 border-white/10 text-white':'bg-white border-slate-200 text-slate-900'}`}>
+      {isDark? '🌙 Dark' : '☀️ Light'}
+    </button>
+  );
+}
+
+function Modal({ children, onClose, isDark }){
+  useEffect(()=>{ const onKey=e=>{ if(e.key==='Escape') onClose&&onClose(); }; document.addEventListener('keydown',onKey); return ()=> document.removeEventListener('keydown',onKey); },[onClose]);
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className={`rounded-2xl p-5 w-[360px] max-w-[92vw] shadow-2xl ${isDark?'bg-slate-900 text-white border border-white/10':'bg-white text-slate-900 border border-slate-200'}`} onClick={e=> e.stopPropagation()}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function Toast({ msg, type='info', isDark }){
+  const color = type==='success' ? 'bg-emerald-500' : type==='error' ? 'bg-rose-500' : type==='warn' ? 'bg-amber-500' : 'bg-slate-700';
+  return (
+    <div className={`toast data-[life=short] px-3 py-2 rounded-xl text-white shadow-lg ${color}`}>{msg}</div>
+  );
+}
+
+function LangPicker({ lang, setLang, langs, flags, names, isDark, open, setOpen, label, closeDelayMs=100 }){
+  const tmr = useRef();
+  return (
+    <div className="relative" onMouseEnter={()=>{ if(tmr.current){clearTimeout(tmr.current);} setOpen(true); }} onMouseLeave={()=>{ tmr.current=setTimeout(()=> setOpen(false), closeDelayMs); }}>
+      <button type="button" className={`px-3 py-2 rounded-xl border text-sm ${isDark?'bg-white/10 border-white/10 text-white':'bg-white border-slate-200 text-slate-900'}`}>{label}: {flags[lang]} {lang.toUpperCase()}</button>
+      <div className={`absolute right-0 mt-2 w-44 rounded-xl border p-2 lang-pop ${open?'open':'closed'} ${isDark?'bg-slate-900 border-white/10':'bg-white border-slate-200'}`}>
+        {langs.map(l=> (
+          <button key={l} className={`w-full text-left px-2 py-1 rounded-lg hover:bg-black/5 ${lang===l?'font-bold':''}`} onClick={()=> setLang(l)}>
+            <span className="mr-2">{flags[l]}</span>{names[l]}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function BubbleDots(){
+  return (
+    <div className="absolute inset-0 grid place-items-center" style={{filter:'url(#goo)'}}>
+      <div className="w-2 h-2 bg-white/90 rounded-full animate-[bubble_2.5s_ease-in-out_infinite]" />
+      <div className="w-3 h-3 bg-white/80 rounded-full absolute left-2 top-2 animate-[bubble_2.2s_ease-in-out_infinite_.2s]" />
+      <div className="w-2.5 h-2.5 bg-white/70 rounded-full absolute right-2 bottom-2 animate-[bubble_2.8s_ease-in-out_infinite_.4s]" />
+    </div>
+  );
+}
+
+/* =============================================================
+   Game effect particles – STAR + DUST
+   ============================================================= */
+function Sparkle({ x, y, angle, dist, size = 18, variant = "star" }){
+  const dx = Math.cos(angle) * dist;
+  const dy = Math.sin(angle) * dist;
+  const rot = Math.round(Math.random() * 360);
+  if (variant === "star") {
+    return (
+      <svg className="sparkle star" style={{ left:x, top:y, "--dx":`${dx}px", "--dy":`${dy}px", "--size":`${size}px", "--rot":`${rot}deg" }} width={size} height={size} viewBox="0 0 24 24">
+        <g className="glow">
+          <circle cx="12" cy="12" r="3" fill="#fff8e1"/>
+          <path d="M12 0 L14 9 L24 12 L14 15 L12 24 L10 15 L0 12 L10 9 Z" fill="#facc15"/>
+        </g>
+      </svg>
+    );
+  }
+  return (
+    <div className="sparkle dust" style={{ left:x, top:y, "--dx":`${dx}px", "--dy":`${dy}px", "--size":`${Math.max(6,size*0.5)}px" }} />
+  );
+}
+
+/* =============================================================
+   Main app
+   ============================================================= */
+export default function TierListApp(){
+  // theme
+  const [theme, setTheme] = useState(()=> localStorage.getItem('clean-tier-theme') || 'light');
+  useEffect(()=>{ localStorage.setItem('clean-tier-theme', theme); },[theme]);
+  const isDark = theme==='dark';
+
+  // lang
+  const [lang, setLang] = useState(()=>{
+    const saved=localStorage.getItem('clean-tier-lang');
+    if(saved && LANGS.includes(saved)) return saved;
+    const nav=(navigator.language||'en').toLowerCase();
+    if(nav.startsWith('ko')) return 'ko';
+    if(nav.startsWith('ja')) return 'ja';
+    if(nav.startsWith('zh')) return 'zh';
     return 'en';
   });
-  useEffect(()=>{ localStorage.setItem('clean-tier-lang', lang); }, [lang]);
-
-  const MSG = {
-    en: {
-      title: 'Arknights Tier – Clean',
-      addTier: 'Add Tier',
-      reset: 'Reset',
-      load4: 'Load 4★',
-      load5: 'Load 5★',
-      load6: 'Load 6★',
-      loadAll: 'Load All',
-      loading: 'Loading…',
-      inputLabel: 'Label (optional)',
-      inputImg: 'Image URL (optional)',
-      addSingle: 'Add One',
-      dragHere: 'Drag items here to place.',
-      confirmResetTitle: 'Revert to initial state',
-      confirmResetDesc: 'This clears all tiers and returns items to the pool.',
-      cancel: 'Cancel',
-      resetGo: 'Reset',
-      // generic confirm
-      confirmLoadTitle: 'Load {star}',
-      confirmLoadDesc: 'Do you want to import {star} operators?',
-      confirmYes: 'Load',
-      // toasts
-      toastOpsSuccess: 'Loaded {n} {star}.',
-      toastOpsNoEntries: 'No entries from the API.',
-      toastOpsNoneToAdd: 'Nothing to add.',
-      toastOpsFail: 'Load failed.',
-      nameShow: 'Show Names',
-      nameHide: 'Hide Names',
-      langTitle: 'Language',
-      star4: '4★',
-      star5: '5★',
-      star6: '6★',
-      starAll: 'All',
-    },
-    ko: {
-      title: 'Arknights Tier – Clean',
-      addTier: '티어 추가',
-      reset: '초기화',
-      load4: '4성 불러오기',
-      load5: '5성 불러오기',
-      load6: '6성 불러오기',
-      loadAll: '전체 불러오기',
-      loading: '불러오는 중…',
-      inputLabel: '라벨 (선택)',
-      inputImg: '이미지 URL (선택)',
-      addSingle: '단일 추가',
-      dragHere: '여기로 드래그해서 배치하세요.',
-      confirmResetTitle: '초기 상태로 되돌립니다',
-      confirmResetDesc: '모든 티어 배치를 비우고 풀로 되돌립니다.',
-      cancel: '취소',
-      resetGo: '초기화',
-      // generic confirm
-      confirmLoadTitle: '{star} 불러오기',
-      confirmLoadDesc: '{star} 오퍼레이터를 불러오겠습니까?',
-      confirmYes: '불러오기',
-      // toasts
-      toastOpsSuccess: '{star} {n}개 불러왔습니다.',
-      toastOpsNoEntries: 'API에서 불러올 항목이 없습니다.',
-      toastOpsNoneToAdd: '추가할 항목이 없습니다.',
-      toastOpsFail: '불러오기에 실패했습니다.',
-      nameShow: '이름 표시',
-      nameHide: '이름 숨기기',
-      langTitle: '언어',
-      star4: '4성',
-      star5: '5성',
-      star6: '6성',
-      starAll: '전체',
-    },
-    ja: {
-      title: 'Arknights Tier – Clean',
-      addTier: 'ティア追加',
-      reset: 'リセット',
-      load4: '★4を読み込む',
-      load5: '★5を読み込む',
-      load6: '★6を読み込む',
-      loadAll: '全て読み込む',
-      loading: '読み込み中…',
-      inputLabel: 'ラベル（任意）',
-      inputImg: '画像URL（任意）',
-      addSingle: '1件追加',
-      dragHere: 'ここにドラッグして配置します。',
-      confirmResetTitle: '初期状態に戻します',
-      confirmResetDesc: '全てのティアをクリアし、プールに戻します。',
-      cancel: 'キャンセル',
-      resetGo: 'リセット',
-      confirmLoadTitle: '{star}の読み込み',
-      confirmLoadDesc: '{star}オペレーターを読み込みますか？',
-      confirmYes: '読み込む',
-      toastOpsSuccess: '{star}を{n}件読み込みました。',
-      toastOpsNoEntries: 'APIから読み込む項目がありません。',
-      toastOpsNoneToAdd: '追加する項目はありません。',
-      toastOpsFail: '読み込みに失敗しました。',
-      nameShow: '名前表示',
-      nameHide: '名前非表示',
-      langTitle: '言語',
-      star4: '★4',
-      star5: '★5',
-      star6: '★6',
-      starAll: '全て',
-    },
-    zh: {
-      title: 'Arknights Tier – Clean',
-      addTier: '添加层级',
-      reset: '重置',
-      load4: '导入4★',
-      load5: '导入5★',
-      load6: '导入6★',
-      loadAll: '全部导入',
-      loading: '加载中…',
-      inputLabel: '标签（可选）',
-      inputImg: '图片URL（可选）',
-      addSingle: '添加一项',
-      dragHere: '拖拽到此处进行放置。',
-      confirmResetTitle: '恢复到初始状态',
-      confirmResetDesc: '清空所有层级并将项目放回池中。',
-      cancel: '取消',
-      resetGo: '重置',
-      confirmLoadTitle: '导入{star}',
-      confirmLoadDesc: '要导入{star}干员吗？',
-      confirmYes: '导入',
-      toastOpsSuccess: '已导入 {n} 个{star}。',
-      toastOpsNoEntries: 'API 未返回可导入的项目。',
-      toastOpsNoneToAdd: '没有可添加的项目。',
-      toastOpsFail: '导入失败。',
-      nameShow: '显示名称',
-      nameHide: '隐藏名称',
-      langTitle: '语言',
-      star4: '4★',
-      star5: '5★',
-      star6: '6★',
-      starAll: '全部',
-    }
-  };
+  useEffect(()=>{ localStorage.setItem('clean-tier-lang', lang); },[lang]);
   const t = (k)=> (MSG[lang] && MSG[lang][k]) || MSG.en[k] || k;
-  const tfmt = (k, vars={}) => (t(k) || '').replace(/\{(\w+)\}/g, (_,m)=> String(vars[m] ?? ''));
+  const tfmt = (k, vars={}) => (t(k)||'').replace(/\{(\w+)\}/g,(_,m)=> String(vars[m] ?? ''));
 
-  // ---------- Toasts ----------
-  const [toasts, setToasts] = useState([]); // {id, msg, type}
-  function pushToast(msg, type='info', duration=2500){
-    const id = uid();
-    setToasts(prev => [...prev, { id, msg, type }]);
-    setTimeout(()=> setToasts(prev => prev.filter(t=> t.id!==id)), duration);
-  }
+  // toast
+  const [toasts, setToasts] = useState([]);
+  function pushToast(msg, type='info', duration=2500){ const id=uid(); setToasts(p=>[...p,{id,msg,type}]); setTimeout(()=> setToasts(p=> p.filter(x=> x.id!==id)), duration); }
 
-  // ---------- Name ON/OFF ----------
-  const [showNames, setShowNames] = useState(true);
-
-  // ---------- Items / Tiers ----------
-  const [items, setItems] = useState(() => []);
-  const [pool, setPool] = useState(() => []);
-  const [tiers, setTiers] = useState(() => [
-    { name: 'S', color: '#60a5fa', items: [] },
-    { name: 'A', color: '#34d399', items: [] },
-    { name: 'B', color: '#fbbf24', items: [] },
-    { name: 'C', color: '#f97316', items: [] },
-    { name: 'D', color: '#ef4444', items: [] },
+  // data
+  const [items, setItems] = useState([]);
+  const [pool, setPool] = useState([]);
+  const [tiers, setTiers] = useState([
+    { name:'S', color:'#60a5fa', items:[] },
+    { name:'A', color:'#34d399', items:[] },
+    { name:'B', color:'#fbbf24', items:[] },
+    { name:'C', color:'#f97316', items:[] },
+    { name:'D', color:'#ef4444', items:[] },
   ]);
 
-  // keep refs size in sync with tiers length
   const tierContainerRefs = useRef({});
-  useEffect(() => {
-    const next = {};
-    tiers.forEach((_, i) => { next[i] = tierContainerRefs.current[i] || null; });
-    tierContainerRefs.current = next;
-  }, [tiers]);
+  useEffect(()=>{ const next={}; tiers.forEach((_,i)=>{ next[i]=tierContainerRefs.current[i]||null; }); tierContainerRefs.current=next; },[tiers]);
 
-  // DnD state
   const [dragData, setDragData] = useState(null);
   const [justPoppedId, setJustPoppedId] = useState(null);
+
+  // sparkles
   const [sparkles, setSparkles] = useState([]);
-  useEffect(()=>{ const tmr=setInterval(()=> setSparkles(prev=> prev.filter(s=> Date.now()-s.createdAt<900)),300); return ()=> clearInterval(tmr); },[]);
+  useEffect(()=>{ const t=setInterval(()=> setSparkles(prev=> prev.filter(s=> Date.now()-s.createdAt<900)),300); return ()=> clearInterval(t); },[]);
   const overlayRef = useRef(null);
+
   const cachedRectsRef = useRef({});
   const rafRef = useRef(null);
   const pendingPosRef = useRef(null);
   const lastPosRef = useRef(null);
 
-  // tier menu/hover
   const [openTierMenu, setOpenTierMenu] = useState(null);
   const [hoverTierIndex, setHoverTierIndex] = useState(null);
   const [hoverInsertIndex, setHoverInsertIndex] = useState(null);
 
-  // reset modal
   const [showResetModal, setShowResetModal] = useState(false);
-
-  // load confirm modal
-  const [confirmTarget, setConfirmTarget] = useState(null); // '4'|'5'|'6'|'all'|null
+  const [confirmTarget, setConfirmTarget] = useState(null);
   const [loadingOps, setLoadingOps] = useState(false);
 
-  // language picker hover state
   const [langOpen, setLangOpen] = useState(false);
 
-  // global end
   const endRef = useRef(()=>{});
   useEffect(()=>{ endRef.current = onDragEnd; });
-  useEffect(()=>{ const handler=()=> endRef.current();
-    window.addEventListener('dragend', handler);
-    window.addEventListener('drop', handler);
-    window.addEventListener('dragcancel', handler);
-    window.addEventListener('pointerup', handler);
-    window.addEventListener('blur', handler);
-    document.addEventListener('mouseleave', handler);
-    return ()=>{ window.removeEventListener('dragend', handler); window.removeEventListener('drop', handler); window.removeEventListener('dragcancel', handler); window.removeEventListener('pointerup', handler); window.removeEventListener('blur', handler); document.removeEventListener('mouseleave', handler); };
-  },[]);
+  useEffect(()=>{ const handler=()=> endRef.current(); window.addEventListener('dragend',handler); window.addEventListener('drop',handler); window.addEventListener('dragcancel',handler); window.addEventListener('pointerup',handler); window.addEventListener('blur',handler); document.addEventListener('mouseleave',handler); return ()=>{ window.removeEventListener('dragend',handler); window.removeEventListener('drop',handler); window.removeEventListener('dragcancel',handler); window.removeEventListener('pointerup',handler); window.removeEventListener('blur',handler); document.removeEventListener('mouseleave',handler); }; },[]);
 
-  // close menus with doc click & ESC
-  useEffect(() => {
-    const onDoc = () => { setOpenTierMenu(null); };
-    const onKey = (e) => {
-      if (e.key === 'Escape') {
-        setOpenTierMenu(null);
-        setShowResetModal(false);
-        setConfirmTarget(null);
-        setLangOpen(false);
-      }
-    };
-    document.addEventListener('click', onDoc);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('click', onDoc);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, []);
-
-  // global dragover -> keep pointer pos
   useEffect(()=>{
     function onGlobalDragOver(e){
-      lastPosRef.current = { x: e.clientX, y: e.clientY };
-      const m = 14;
-      let foundIdx = null;
+      lastPosRef.current = { x:e.clientX, y:e.clientY };
+      const m=14; let found=null;
       for(const [k,el] of Object.entries(tierContainerRefs.current||{})){
-        if(!el) continue; const r = el.getBoundingClientRect();
-        const inside = e.clientX >= r.left - m && e.clientX <= r.right + m && e.clientY >= r.top - m && e.clientY <= r.bottom + m;
-        if(inside){ foundIdx = Number(k); break; }
+        if(!el) continue; const r=el.getBoundingClientRect();
+        const inside = e.clientX>=r.left-m && e.clientX<=r.right+m && e.clientY>=r.top-m && e.clientY<=r.bottom+m;
+        if(inside){ found=Number(k); break; }
       }
-      if(foundIdx==null){ setHoverTierIndex(null); setHoverInsertIndex(null); }
+      if(found==null){ setHoverTierIndex(null); setHoverInsertIndex(null); }
     }
     window.addEventListener('dragover', onGlobalDragOver);
     return ()=> window.removeEventListener('dragover', onGlobalDragOver);
   },[]);
 
-  // paste images
   useEffect(()=>{
-    function onPaste(e){ const items=e.clipboardData?.items; if(!items) return; const files=[]; for(const it of items){ if(it.kind==='file'){ const f=it.getAsFile(); if(f && f.type.startsWith('image/')) files.push(f); } } if(files.length){ e.preventDefault(); addFilesAsItems(files);} }
-    window.addEventListener('paste',onPaste); return ()=> window.removeEventListener('paste',onPaste);
+    function onPaste(e){ const items=e.clipboardData?.items; if(!items) return; const files=[]; for(const it of items){ if(it.kind==='file'){ const f=it.getAsFile(); if(f && f.type.startsWith('image/')) files.push(f); } } if(files.length){ e.preventDefault(); addFilesAsItems(files); } }
+    window.addEventListener('paste', onPaste); return ()=> window.removeEventListener('paste', onPaste);
   },[]);
 
   const itemById = useMemo(()=> Object.fromEntries(items.map(i=>[i.id,i])), [items]);
+  const displayName = (item)=> (item?.nameMap?.[lang] || item?.nameMap?.en || item?.label || '');
 
-  // smoke checks
-  useEffect(() => {
-    try {
-      console.assert(Array.isArray(tiers) && tiers.length >= 1, 'tiers initialized');
-      console.assert(clamp(5,0,3)===3 && clamp(-1,0,3)===0, 'clamp bounds');
-      const a=[1,3]; const b=insertAt(a,1,2); console.assert(JSON.stringify(b)==='[1,2,3]' && a.length===2, 'insertAt');
-      console.assert(typeof uid()==='string' && uid().length>=6, 'uid ok');
-      console.assert(computeInsertIndex(null,0,0)===0, 'insertIndex null safe');
-    } catch {}
-  }, []);
-
-  // ---------- DnD handlers ----------
-  function onDragStart(e,payload){
-    e.dataTransfer.setData('text/plain', JSON.stringify(payload));
-    e.dataTransfer.effectAllowed='move';
-    setDragData(payload);
-    cachedRectsRef.current = {};
-  }
-  function onDragEnd(){
-    setDragData(null);
-    setHoverTierIndex(null);
-    setHoverInsertIndex(null);
-    cachedRectsRef.current = {};
-    if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current=null; }
-    pendingPosRef.current = null;
-    lastPosRef.current = null;
-  }
+  // --------------- DnD ---------------
+  function onDragStart(e, payload){ e.dataTransfer.setData('text/plain', JSON.stringify(payload)); e.dataTransfer.effectAllowed='move'; setDragData(payload); cachedRectsRef.current={}; }
+  function onDragEnd(){ setDragData(null); setHoverTierIndex(null); setHoverInsertIndex(null); cachedRectsRef.current={}; if(rafRef.current){ cancelAnimationFrame(rafRef.current); rafRef.current=null; } pendingPosRef.current=null; lastPosRef.current=null; }
   function onDragOver(e){ e.preventDefault(); e.dataTransfer.dropEffect='move'; }
 
   function moveItem({id,from,to}){
@@ -318,29 +328,21 @@ export default function TierListApp() {
 
   function onDropToTier(e, tierIndex){
     e.preventDefault();
-    try {
+    try{
       const data=JSON.parse(e.dataTransfer.getData('text/plain'));
       const container=tierContainerRefs.current[tierIndex];
-      let insertIndex=computeInsertIndex(container,e.clientX,e.clientY,(data.from && data.from.tierIndex===tierIndex)? data.id : null);
+      let insertIndex=computeInsertIndex(container, e.clientX, e.clientY, (data.from && data.from.tierIndex===tierIndex)? data.id : null);
       moveItem({ id:data.id, from:data.from, to:{ tierIndex, index:insertIndex } });
-      if (tierIndex === 0) {
+      if(tierIndex===0){
         setJustPoppedId(data.id);
-        requestAnimationFrame(() => {
-          const card = tierContainerRefs.current[tierIndex]?.querySelector(
-            `[data-role="card"][data-id="${data.id}"]`
-          );
-          if (card) {
-            const r = card.getBoundingClientRect();
-            const cx = r.left + r.width / 2;
-            const cy = r.top + r.height / 2;
-            triggerSparkles(cx, cy);
-          } else {
-            triggerSparkles(e.clientX, e.clientY);
-          }
+        requestAnimationFrame(()=>{
+          const card=tierContainerRefs.current[tierIndex]?.querySelector(`[data-role="card"][data-id="${data.id}"]`);
+          if(card){ const r=card.getBoundingClientRect(); const cx=r.left+r.width/2; const cy=r.top+r.height/2; triggerSparkles(cx, cy, setSparkles); }
+          else { triggerSparkles(e.clientX, e.clientY, setSparkles); }
         });
-        setTimeout(() => setJustPoppedId(null), 450);
+        setTimeout(()=> setJustPoppedId(null), 450);
       }
-    } catch {}
+    }catch{}
     onDragEnd();
   }
   function onDropToPool(e){ e.preventDefault(); try{ const data=JSON.parse(e.dataTransfer.getData('text/plain')); moveItem({ id:data.id, from:data.from, to:'pool' }); }catch{} onDragEnd(); }
@@ -348,107 +350,48 @@ export default function TierListApp() {
   function getCardRects(container){
     if(!container) return [];
     const cards=[...container.querySelectorAll('[data-role="card"]')];
-    return cards.map(el=>{
-      const r=el.getBoundingClientRect();
-      const id = el.dataset.id;
-      return {
-        id,
-        cx:r.left+r.width/2, cy:r.top+r.height/2,
-        left:r.left, right:r.right, top:r.top, bottom:r.bottom,
-        w:r.width, h:r.height
-      };
-    });
+    return cards.map(el=>{ const r=el.getBoundingClientRect(); const id=el.dataset.id; return { id, cx:r.left+r.width/2, cy:r.top+r.height/2, left:r.left, right:r.right, top:r.top, bottom:r.bottom, w:r.width, h:r.height }; });
   }
 
-  // ---- Row-based insert index (Save4) ----
   function computeInsertIndex(container, x, y, excludeId){
     if(!container) return 0;
-    const tierIndex = Number(container?.dataset?.tierIndex ?? -1);
-    let rects = cachedRectsRef.current[tierIndex];
-    if(!rects){ rects = getCardRects(container); cachedRectsRef.current[tierIndex]=rects; }
+    const tierIndex=Number(container?.dataset?.tierIndex ?? -1);
+    let rects=cachedRectsRef.current[tierIndex];
+    if(!rects){ rects=getCardRects(container); cachedRectsRef.current[tierIndex]=rects; }
     if(!rects.length) return 0;
 
-    let list = excludeId ? rects.filter(r=> r.id !== excludeId) : rects.slice();
+    let list=excludeId? rects.filter(r=> r.id!==excludeId) : rects.slice();
     if(!list.length) return 0;
 
     list.sort((a,b)=> (a.top===b.top ? a.left-b.left : a.top-b.top));
+    const avgH = list.reduce((s,r)=> s+(r.h||0), 0)/list.length || 100;
+    const rowThresh = Math.max(avgH*0.35, 28);
 
-    const avgH = list.reduce((s, r) => s + (r.h || 0), 0) / list.length || 100;
-    const rowThresh = Math.max(avgH * 0.35, 28);
-
-    const rows = [];
+    const rows=[];
     for(const r of list){
-      if(!rows.length){
-        rows.push({ items:[r], refTop:r.top, top:r.top, bottom:r.bottom });
-        continue;
-      }
-      const cur = rows[rows.length-1];
-      const sameRow = Math.abs(r.top - cur.refTop) <= rowThresh;
-      if(sameRow){
-        cur.items.push(r);
-        cur.refTop = (cur.refTop * (cur.items.length-1) + r.top) / cur.items.length;
-        cur.top = Math.min(cur.top, r.top);
-        cur.bottom = Math.max(cur.bottom, r.bottom);
-      }else{
-        rows.push({ items:[r], refTop:r.top, top:r.top, bottom:r.bottom });
-      }
+      if(!rows.length){ rows.push({ items:[r], refTop:r.top, top:r.top, bottom:r.bottom }); continue; }
+      const cur=rows[rows.length-1];
+      const sameRow = Math.abs(r.top-cur.refTop) <= rowThresh;
+      if(sameRow){ cur.items.push(r); cur.refTop=(cur.refTop*(cur.items.length-1)+r.top)/cur.items.length; cur.top=Math.min(cur.top,r.top); cur.bottom=Math.max(cur.bottom,r.bottom); }
+      else { rows.push({ items:[r], refTop:r.top, top:r.top, bottom:r.bottom }); }
     }
     rows.forEach(row=> row.items.sort((a,b)=> a.left-b.left));
 
-    let targetRowIndex = 0, best = Infinity;
-    for(let i=0;i<rows.length;i++){
-      const row = rows[i];
-      const cy = (row.top + row.bottom) / 2;
-      const d = Math.abs(y - cy);
-      if(d < best){ best = d; targetRowIndex = i; }
-    }
-    const targetRow = rows[targetRowIndex];
+    let targetRowIndex=0, best=Infinity;
+    for(let i=0;i<rows.length;i++){ const row=rows[i]; const cy=(row.top+row.bottom)/2; const d=Math.abs(y-cy); if(d<best){ best=d; targetRowIndex=i; } }
+    const targetRow=rows[targetRowIndex];
 
-    let within = targetRow.items.length;
-    for(let i=0;i<targetRow.items.length;i++){
-      if(x < targetRow.items[i].cx){ within = i; break; }
-    }
+    let within=targetRow.items.length;
+    for(let i=0;i<targetRow.items.length;i++){ if(x<targetRow.items[i].cx){ within=i; break; } }
 
-    const before = rows.slice(0, targetRowIndex).reduce((s,row)=> s + row.items.length, 0);
-    const absIndex = before + within;
+    const before=rows.slice(0,targetRowIndex).reduce((s,row)=> s+row.items.length, 0);
+    const absIndex=before+within;
     return clamp(absIndex, 0, list.length);
   }
 
-  const isPointInsideTier = (tierIdx, margin=12) => {
-    const p = lastPosRef.current; const el = tierContainerRefs.current[tierIdx];
-    if(!p || !el) return false; const r = el.getBoundingClientRect();
-    return p.x >= r.left - margin && p.x <= r.right + margin && p.y >= r.top - margin && p.y <= r.bottom + margin;
-  };
+  const isPointInsideTier=(tierIdx, margin=12)=>{ const p=lastPosRef.current; const el=tierContainerRefs.current[tierIdx]; if(!p||!el) return false; const r=el.getBoundingClientRect(); return p.x>=r.left-margin && p.x<=r.right+margin && p.y>=r.top-margin && p.y<=r.bottom+margin; };
 
-  // ====== GAME EFFECT triggerSparkles (stars + dust, random) ======
-  function triggerSparkles(x, y) {
-    const id = uid();
-    const stars = 3 + Math.floor(Math.random() * 2);   // 3~4
-    const dusts = 10 + Math.floor(Math.random() * 3);  // 10~12
-    const N = stars + dusts;
-
-    const arr = Array.from({ length: N }, (_, i) => {
-      const isStar = i < stars;
-      const angle  = Math.random() * Math.PI * 2;
-      const dist   = (isStar ? 22 : 18) + Math.random() * (isStar ? 38 : 30);
-      const jitterX = (Math.random() - 0.5) * 12;
-      const jitterY = (Math.random() - 0.5) * 12;
-      const size = isStar ? (14 + Math.random() * 10) : (6 + Math.random() * 6);
-
-      return {
-        id: `${id}-${i}`,
-        x: x + jitterX,
-        y: y + jitterY,
-        angle,
-        dist,
-        size,
-        variant: isStar ? "star" : "dust",
-        createdAt: Date.now(),
-      };
-    });
-    setSparkles(prev => [...prev, ...arr]);
-  }
-
+  // edit tier name
   const [editingTierIndex,setEditingTierIndex]=useState(null);
   const [editingTierValue,setEditingTierValue]=useState('');
   function startEditTier(i){ setEditingTierIndex(i); setEditingTierValue(tiers[i].name); }
@@ -457,126 +400,49 @@ export default function TierListApp() {
   function removeTier(idx){ setTiers(prev=>{ const copy=prev.map(t=>({...t,items:[...t.items]})); const back=copy[idx].items; const next=copy.filter((_,i)=> i!==idx); setPool(p=>[...p,...back]); return next; }); }
   function setTierColor(idx,color){ setTiers(prev=> prev.map((t,i)=> i===idx? {...t,color} : t)); }
 
+  // add items
   const [newLabel,setNewLabel]=useState('');
   const [newImgUrl,setNewImgUrl]=useState('');
   function onSelectFiles(e){ const files=[...(e.target.files||[])]; if(files.length) addFilesAsItems(files); e.target.value=''; }
   function addFilesAsItems(files){ const readers=files.map(file=> new Promise(res=>{ const r=new FileReader(); r.onload=()=> res({name:file.name.replace(/\.[^.]+$/, ''), dataUrl:r.result}); r.readAsDataURL(file); })); Promise.all(readers).then(list=>{ const created=list.map(({name,dataUrl})=> makeItem({ label:name, image:dataUrl })); setItems(prev=>[...prev,...created]); setPool(prev=>[...prev,...created.map(c=>c.id)]); }); }
   function addNewItem(label,image){ const it=makeItem({ label:label||'New Item', image:image||newImgUrl||'' }); setItems(p=>[...p,it]); setPool(p=>[...p,it.id]); setNewLabel(''); setNewImgUrl(''); }
 
-  // build item with nameMap for all langs (fallback to provided label)
-  function makeItem({label, image, nameMap}){
-    const base = label || '';
-    const map = nameMap || { en: base, ko: base, ja: base, zh: base };
-    return { id: uid(), label: base, image: image||'', nameMap: map };
-  }
-  const displayName = (item)=> (item?.nameMap?.[lang] || item?.nameMap?.en || item?.label || '');
+  function makeItem({label, image, nameMap}){ const base=label||''; const map=nameMap || {en:base,ko:base,ja:base,zh:base}; return { id:uid(), label:base, image:image||'', nameMap:map }; }
 
-  // ---- Unified Loader (4/5/6/All) ----
-  async function loadFromOps(star) {
-    if (loadingOps) return;
-    setLoadingOps(true);
+  // ops loader (simple fallback-only demo)
+  async function loadFromOps(star){
+    if(loadingOps) return; setLoadingOps(true);
     const starLabel = star==='all' ? t('starAll') : (star==='4'?t('star4'):star==='5'?t('star5'):t('star6'));
-
-    try {
-      // try query endpoint first, then fallback to /api/opsX
-      const tryEndpoints = [];
-      if (star === 'all') {
-        tryEndpoints.push('/api/ops?star=all', '/api/opsAll');
-      } else {
-        tryEndpoints.push(`/api/ops?star=${star}`, `/api/ops${star}`);
-      }
-
-      let raw = null, ok = false;
-      for (const url of tryEndpoints) {
-        try {
-          const r = await fetch(url, { headers: { 'Accept': 'application/json' } });
-          if (!r.ok) continue;
-          raw = await r.json();
-          ok = true;
-          break;
-        } catch {}
-      }
-      if (!ok) throw new Error('fetch fail');
-
-      const arr = Array.isArray(raw)
-        ? raw
-        : Array.isArray(raw?.data)
-        ? raw.data
-        : Array.isArray(raw?.result)
-        ? raw.result
-        : [];
-
-      if (!arr.length) { pushToast(t('toastOpsNoEntries'), 'warn'); return; }
-
-      const norm = arr.map((x)=>{
-        if (x == null) return null;
-        if (typeof x === 'string') {
-          const s = String(x);
-          return makeItem({ label:s, image:'' , nameMap:{ en:s, ko:s, ja:s, zh:s }});
-        }
-        const en = x.en || x.label || x.name || x.appellation || '';
-        const ko = x.kr || x.ko || '';
-        const ja = x.jp || x.ja || '';
-        const zh = x.zh || x.cn || '';
-        const any = en || ko || ja || zh || '';
-        const img = x.image || x.icon || x.img || x.url || x.src || '';
-        const map = {
-          en: String(en || any),
-          ko: String(ko || any),
-          ja: String(ja || any),
-          zh: String(zh || any),
-        };
-        return makeItem({ label: map.en || any, image: img, nameMap: map });
-      }).filter(Boolean);
-
-      // de-dup against existing
-      const existing = new Set(items.map((it)=> it.nameMap?.en || it.label));
-      const seen = new Set();
-      const createFrom = [];
-      for (const it of norm) {
-        const k = (it.nameMap?.en || it.label);
-        if (existing.has(k)) continue;
-        if (seen.has(k)) continue;
-        seen.add(k); createFrom.push(it);
-      }
-
-      if (!createFrom.length) { pushToast(t('toastOpsNoneToAdd'), 'warn'); return; }
-
-      setItems((p)=> [...p, ...createFrom]);
-      setPool((p)=> [...p, ...createFrom.map(c=>c.id)]);
-
-      pushToast(tfmt('toastOpsSuccess', { n: createFrom.length, star: starLabel }), 'success');
-    } catch (e) {
-      console.error(e);
-      pushToast(t('toastOpsFail'), 'error');
-    } finally {
-      setLoadingOps(false);
-      setConfirmTarget(null);
-    }
+    try{
+      const url = star==='all' ? '/api/opsAll' : `/api/ops${star}`;
+      let raw=[]; try{ const r=await fetch(url,{headers:{'Accept':'application/json'}}); if(r.ok){ raw=await r.json(); } }catch{}
+      const arr = Array.isArray(raw) ? raw : Array.isArray(raw?.data) ? raw.data : [];
+      if(!arr.length){ pushToast(t('toastOpsNoEntries'),'warn'); return; }
+      const norm = arr.map(x=>{ if(!x) return null; if(typeof x==='string'){ const s=String(x); return makeItem({label:s, image:'' , nameMap:{en:s,ko:s,ja:s,zh:s}}); } const en=x.en||x.label||x.name||x.appellation||''; const ko=x.kr||x.ko||''; const ja=x.jp||x.ja||''; const zh=x.zh||x.cn||''; const any=en||ko||ja||zh||''; const img=x.image||x.icon||x.img||x.url||x.src||''; const map={ en:String(en||any), ko:String(ko||any), ja:String(ja||any), zh:String(zh||any), }; return makeItem({label:map.en||any, image:img, nameMap:map}); }).filter(Boolean);
+      const existing=new Set(items.map(it=> it.nameMap?.en || it.label)); const seen=new Set(); const createFrom=[]; for(const it of norm){ const k=(it.nameMap?.en || it.label); if(existing.has(k)) continue; if(seen.has(k)) continue; seen.add(k); createFrom.push(it); }
+      if(!createFrom.length){ pushToast(t('toastOpsNoneToAdd'),'warn'); return; }
+      setItems(p=>[...p,...createFrom]); setPool(p=>[...p,...createFrom.map(c=>c.id)]);
+      pushToast(tfmt('toastOpsSuccess',{n:createFrom.length, star:starLabel}),'success');
+    }catch(e){ console.error(e); pushToast(t('toastOpsFail'),'error'); }
+    finally{ setLoadingOps(false); setConfirmTarget(null); }
   }
 
-  // Reset via modal
-  function doReset() {
-    setPool(items.map(i=>i.id));
-    setTiers(prev=> prev.map(t=>({...t,items:[]})));
-    setConfirmTarget(null);
-    setShowResetModal(false);
-  }
+  function doReset(){ setPool(items.map(i=>i.id)); setTiers(prev=> prev.map(t=>({...t,items:[]}))); setConfirmTarget(null); setShowResetModal(false); }
 
   return (
     <div className={`${isDark?'text-white':'text-slate-900'} min-h-screen transition-colors duration-300 ${isDark?'bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800':'bg-gradient-to-br from-slate-100 via-white to-slate-100'}`}>
       <GooDefs/>
-      <div ref={overlayRef} className="pointer-events-none fixed inset-0 z-50">{sparkles.map(s=> <Sparkle key={s.id} x={s.x} y={s.y} angle={s.angle} dist={s.dist} size={s.size} variant={s.variant}/> )}</div>
 
-      {/* Theme toggle moved to bottom-left */}
+      {/* Sparkle overlay */}
+      <div ref={overlayRef} className="pointer-events-none fixed inset-0 z-50">
+        {sparkles.map(s=> <Sparkle key={s.id} {...s} />)}
+      </div>
+
+      {/* Theme toggle */}
       <ThemeToggle isDark={isDark} onToggle={()=> setTheme(isDark?'light':'dark')} position="bl" />
 
-      {/* Toast container (top-right) */}
-      <div className="fixed top-4 right-4 z-[70] space-y-2">
-        {toasts.map(ti => (
-          <Toast key={ti.id} msg={ti.msg} type={ti.type} isDark={isDark} />
-        ))}
-      </div>
+      {/* Toasts */}
+      <div className="fixed top-4 right-4 z-[70] space-y-2">{toasts.map(ti=> <Toast key={ti.id} msg={ti.msg} type={ti.type} isDark={isDark}/> )}</div>
 
       {/* Reset modal */}
       {showResetModal && (
@@ -585,43 +451,22 @@ export default function TierListApp() {
             <h3 className="text-lg font-bold">{t('confirmResetTitle')}</h3>
             <p className="text-sm opacity-80">{t('confirmResetDesc')}</p>
             <div className="flex justify-center gap-3 pt-2">
-              <button
-                onClick={()=> setShowResetModal(false)}
-                className={`px-4 py-2 rounded-xl border ${isDark?'bg-white/10 border-white/10':'bg-white border-slate-200'}`}
-              >{t('cancel')}</button>
-              <button
-                onClick={doReset}
-                className="px-4 py-2 rounded-xl text-white shadow-lg"
-                style={{background:'linear-gradient(180deg,#fb7185,#ef4444)'}}
-              >{t('resetGo')}</button>
+              <button onClick={()=> setShowResetModal(false)} className={`px-4 py-2 rounded-xl border ${isDark?'bg-white/10 border-white/10':'bg-white border-slate-200'}`}>{t('cancel')}</button>
+              <button onClick={doReset} className="px-4 py-2 rounded-xl text-white shadow-lg" style={{background:'linear-gradient(180deg,#fb7185,#ef4444)'}}>{t('resetGo')}</button>
             </div>
           </div>
         </Modal>
       )}
 
-      {/* Generic load confirm modal */}
+      {/* Load confirm modal */}
       {confirmTarget && (
         <Modal onClose={()=> setConfirmTarget(null)} isDark={isDark}>
           <div className="text-center space-y-4">
-            <h3 className="text-lg font-bold">
-              {tfmt('confirmLoadTitle', { star: confirmTarget==='all' ? t('starAll') : confirmTarget==='4'?t('star4'):confirmTarget==='5'?t('star5'):t('star6') })}
-            </h3>
-            <p className="text-sm opacity-80">
-              {tfmt('confirmLoadDesc', { star: confirmTarget==='all' ? t('starAll') : confirmTarget==='4'?t('star4'):confirmTarget==='5'?t('star5'):t('star6') })}
-            </p>
+            <h3 className="text-lg font-bold">{tfmt('confirmLoadTitle',{star: confirmTarget==='all'? t('starAll') : confirmTarget==='4'? t('star4') : confirmTarget==='5'? t('star5') : t('star6') })}</h3>
+            <p className="text-sm opacity-80">{tfmt('confirmLoadDesc',{star: confirmTarget==='all'? t('starAll') : confirmTarget==='4'? t('star4') : confirmTarget==='5'? t('star5') : t('star6') })}</p>
             <div className="flex justify-center gap-3 pt-2">
-              <button
-                onClick={()=> setConfirmTarget(null)}
-                className={`px-4 py-2 rounded-xl border ${isDark?'bg-white/10 border-white/10':'bg-white border-slate-200'}`}
-              >{t('cancel')}</button>
-              <button
-                onClick={()=> loadFromOps(confirmTarget)}
-                className="px-4 py-2 rounded-xl text-white shadow-lg disabled:opacity-60"
-                disabled={loadingOps}
-                style={{background:'linear-gradient(180deg,#60a5fa,#38bdf8)'}}
-              >
-                {loadingOps ? t('loading') : t('confirmYes')}
-              </button>
+              <button onClick={()=> setConfirmTarget(null)} className={`px-4 py-2 rounded-xl border ${isDark?'bg-white/10 border-white/10':'bg-white border-slate-200'}`}>{t('cancel')}</button>
+              <button onClick={()=> loadFromOps(confirmTarget)} disabled={loadingOps} className="px-4 py-2 rounded-xl text-white shadow-lg disabled:opacity-60" style={{background:'linear-gradient(180deg,#60a5fa,#38bdf8)'}}>{loadingOps? t('loading') : t('confirmYes')}</button>
             </div>
           </div>
         </Modal>
@@ -636,47 +481,13 @@ export default function TierListApp() {
           <div className="flex items-center gap-2 md:gap-3">
             <BlobButton onClick={addTier}>{t('addTier')}</BlobButton>
             <BlobButton onClick={()=> setShowResetModal(true)}>{t('reset')}</BlobButton>
-
-            {/* Load buttons: 4,5,6,All */}
-            <BlobButton onClick={()=> setConfirmTarget('4')} disabled={loadingOps}>
-              {t('load4')}
-            </BlobButton>
-            <BlobButton onClick={()=> setConfirmTarget('5')} disabled={loadingOps}>
-              {t('load5')}
-            </BlobButton>
-            <BlobButton onClick={()=> setConfirmTarget('6')} disabled={loadingOps}>
-              {t('load6')}
-            </BlobButton>
-            <BlobButton onClick={()=> setConfirmTarget('all')} disabled={loadingOps}>
-              {t('loadAll')}
-            </BlobButton>
-            {/* PNG Export */}
+            <BlobButton onClick={()=> setConfirmTarget('4')} disabled={loadingOps}>{t('load4')}</BlobButton>
+            <BlobButton onClick={()=> setConfirmTarget('5')} disabled={loadingOps}>{t('load5')}</BlobButton>
+            <BlobButton onClick={()=> setConfirmTarget('6')} disabled={loadingOps}>{t('load6')}</BlobButton>
+            <BlobButton onClick={()=> setConfirmTarget('all')} disabled={loadingOps}>{t('loadAll')}</BlobButton>
             <ExportPNG targetId="tierlist-capture" fileName="tierlist" scale={3} />
-
-
-            {/* Name toggle */}
-            <button
-              type="button"
-              onClick={()=> setShowNames(v=>!v)}
-              className={`px-3 py-2 rounded-xl border text-sm ${isDark?'bg-white/10 border-white/10 text-white':'bg-white border-slate-200 text-slate-900'}`}
-              title={t('nameShow')}
-            >
-              {showNames ? t('nameHide') : t('nameShow')}
-            </button>
-
-            {/* Language selector (hover-expand, close delay 0.1s) */}
-            <LangPicker
-              lang={lang}
-              setLang={setLang}
-              langs={LANGS}
-              flags={FLAGS}
-              names={NAMES}
-              isDark={isDark}
-              open={langOpen}
-              setOpen={setLangOpen}
-              label={t('langTitle')}
-              closeDelayMs={100}
-            />
+            <NameToggle isDark={isDark}/>
+            <LangPicker lang={lang} setLang={setLang} langs={LANGS} flags={FLAGS} names={NAMES} isDark={isDark} open={langOpen} setOpen={setLangOpen} label={t('langTitle')} closeDelayMs={100}/>
           </div>
         </div>
       </header>
@@ -684,10 +495,9 @@ export default function TierListApp() {
       <main id="tierboard" className="mx-auto max-w-[1400px] px-4 py-6">
         {/* Upload */}
         <section className="mb-6">
-          <div
-            className={`rounded-2xl p-4 md:p-6 shadow-xl border ${isDark ? 'bg-white/5 border-white/15 text-white' : 'bg-white border-slate-200 text-slate-900'}` }
+          <div className={`rounded-2xl p-4 md:p-6 shadow-xl border ${isDark ? 'bg-white/5 border-white/15 text-white' : 'bg-white border-slate-200 text-slate-900'}`}
             onDragOver={e=>{e.preventDefault(); e.dataTransfer.dropEffect='copy';}}
-            onDrop={e=>{ e.preventDefault(); const files=[...e.dataTransfer.files].filter(f=>f.type.startsWith('image/')); if(files.length) addFilesAsItems(files); }}
+            onDrop={e=>{ e.preventDefault(); const files=[...e.dataTransfer.files].filter(f=> f.type.startsWith('image/')); if(files.length) addFilesAsItems(files); }}
           >
             <div className="flex flex-wrap gap-3 items-center">
               <label className={`cursor-pointer inline-flex items-center gap-2 px-3 py-2 rounded-xl border transition ${isDark?'bg-white/10 border-white/10 hover:bg-white/15':'bg-slate-50 border-slate-200 hover:bg-slate-100'}`}>파일 선택(복수)
@@ -705,177 +515,81 @@ export default function TierListApp() {
         <section className="mb-6">
           <div onDragOver={onDragOver} onDrop={onDropToPool} className="min-h-[112px] rounded-2xl p-3 flex flex-wrap gap-3 bg-transparent">
             {pool.map((id,index)=> (
-              <DraggableItem
-                key={id}
-                item={itemById[id]}
-                onDragStart={(e)=> onDragStart(e,{id, from:'pool'})}
-                justPopped={justPoppedId===id}
-                index={index}
-                isDark={isDark}
-                isDragging={dragData?.id===id}
-                showNames={showNames}
-                name={displayName(itemById[id])}
-                onRename={newName=> {
-                  setItems(prev=> prev.map(it=> it.id===id? {...it, label:newName, nameMap:{en:newName,ko:newName,ja:newName,zh:newName}}: it))
-                }}
-                onDelete={()=>{ setItems(prev=> prev.filter(it=> it.id!==id)); setPool(prev=> prev.filter(x=> x!==id)); }}
-              />
+              <DraggableItem key={id} item={itemById[id]} onDragStart={(e)=> onDragStart(e,{id, from:'pool'})} justPopped={justPoppedId===id} index={index} isDark={isDark} isDragging={dragData?.id===id} name={displayName(itemById[id])} showNamesState={{showNamesState:true}} onRename={newName=>{ setItems(prev=> prev.map(it=> it.id===id? {...it, label:newName, nameMap:{en:newName,ko:newName,ja:newName,zh:newName}}: it)); }} onDelete={()=>{ setItems(prev=> prev.filter(it=> it.id!==id)); setPool(prev=> prev.filter(x=> x!==id)); }} />
             ))}
           </div>
         </section>
 
         {/* Tiers */}
         <div id="tierlist-capture">
-<section className="space-y-4">
-          {tiers.map((tier,idx)=> (
-            <div key={idx} className="relative group/tier">
-              <div className="flex items-stretch gap-3">
-                {/* Left tier label */}
-                <div className="w-24 shrink-0 rounded-2xl shadow-lg overflow-visible border" style={{borderColor: isDark? 'rgba(255,255,255,0.1)':'#e5e7eb'}}>
-                  <div className="relative h-full min-h-[64px] rounded-2xl overflow-visible grid place-items-center font-extrabold text-base text-slate-900 select-none" style={{ background:`linear-gradient(135deg, ${tier.color}, #ffffff)` }} onContextMenu={e=>{ e.preventDefault(); e.stopPropagation(); setOpenTierMenu(openTierMenu===idx? null: idx); }} onClick={e=> e.stopPropagation()}>
-                    {editingTierIndex===idx ? (
-                      <input autoFocus value={editingTierValue} onChange={e=> setEditingTierValue(e.target.value)} onBlur={commitEditTier} onKeyDown={e=> e.key==='Enter' && commitEditTier()} className="w-20 mx-1 rounded-lg px-1 py-0.5 bg-white/80 text-slate-900 text-sm focus:outline-none"/>
-                    ) : (
-                      <button onClick={()=> startEditTier(idx)} title="Edit tier name" className="w-full h-full">{tier.name}</button>
-                    )}
-                    {openTierMenu===idx && (
-                      <div className={`absolute top-16 right-1 z-[70] rounded-xl border p-2 w-48 overflow-hidden ${isDark? 'bg-slate-900 border-white/10 text-white':'bg-white border-slate-200 text-slate-900'} shadow-xl`} onClick={e=> e.stopPropagation()}>
-                        <label className="flex items-center justify-between text-sm mb-2">Color
-                          <input type="color" value={tier.color} onChange={e=> setTierColor(idx, e.target.value)} className="w-6 h-6 border-0 p-0 bg-transparent cursor-pointer" />
-                        </label>
-                        <button onClick={()=> startEditTier(idx)} className="w-full text-left text-sm px-2 py-1 rounded-lg hover:bg:black/5">Rename</button>
-                        <button onClick={()=> { removeTier(idx); setOpenTierMenu(null); }} className="w-full text-left text-sm px-2 py-1 rounded-lg hover:bg-black/5 text-rose-500">Delete tier</button>
-                      </div>
-                    )}
+          <section className="space-y-4">
+            {tiers.map((tier,idx)=> (
+              <div key={idx} className="relative group/tier">
+                <div className="flex items-stretch gap-3">
+                  {/* Label */}
+                  <div className="w-24 shrink-0 rounded-2xl shadow-lg overflow-visible border" style={{borderColor: isDark? 'rgba(255,255,255,0.1)':'#e5e7eb'}}>
+                    <div className="relative h-full min-h-[64px] rounded-2xl overflow-visible grid place-items-center font-extrabold text-base text-slate-900 select-none" style={{ background:`linear-gradient(135deg, ${tier.color}, #ffffff)` }} onContextMenu={e=>{ e.preventDefault(); e.stopPropagation(); setOpenTierMenu(openTierMenu===idx? null: idx); }} onClick={e=> e.stopPropagation()}>
+                      {editingTierIndex===idx ? (
+                        <input autoFocus value={editingTierValue} onChange={e=> setEditingTierValue(e.target.value)} onBlur={commitEditTier} onKeyDown={e=> e.key==='Enter' && commitEditTier()} className="w-20 mx-1 rounded-lg px-1 py-0.5 bg-white/80 text-slate-900 text-sm focus:outline-none"/>
+                      ) : (
+                        <button onClick={()=> startEditTier(idx)} title="Edit tier name" className="w-full h-full">{tier.name}</button>
+                      )}
+                      {openTierMenu===idx && (
+                        <div className={`absolute top-16 right-1 z-[70] rounded-xl border p-2 w-48 overflow-hidden ${isDark? 'bg-slate-900 border-white/10 text-white':'bg-white border-slate-200 text-slate-900'} shadow-xl`} onClick={e=> e.stopPropagation()}>
+                          <label className="flex items-center justify-between text-sm mb-2">Color
+                            <input type="color" value={tier.color} onChange={e=> setTierColor(idx, e.target.value)} className="w-6 h-6 border-0 p-0 bg-transparent cursor-pointer" />
+                          </label>
+                          <button onClick={()=> startEditTier(idx)} className="w-full text-left text-sm px-2 py-1 rounded-lg hover:bg-black/5">Rename</button>
+                          <button onClick={()=> { removeTier(idx); setOpenTierMenu(null); }} className="w-full text-left text-sm px-2 py-1 rounded-lg hover:bg-black/5 text-rose-500">Delete tier</button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Drop zone */}
+                  <div ref={el=> (tierContainerRefs.current[idx]=el)} data-tier-index={idx}
+                    onDragOver={e=>{ onDragOver(e); pendingPosRef.current={ idx, x:e.clientX, y:e.clientY }; if(!rafRef.current){ rafRef.current=requestAnimationFrame(()=>{ rafRef.current=null; const p=pendingPosRef.current; if(!p) return; const {idx:xIdx, x, y}=p; setHoverTierIndex(xIdx); const c=tierContainerRefs.current[xIdx]; let i=computeInsertIndex(c,x,y,(dragData && dragData.from && dragData.from.tierIndex===xIdx)? dragData.id : null); setHoverInsertIndex(i); lastPosRef.current={x,y}; pendingPosRef.current=null; }); } }}
+                    onDragLeave={()=>{ const c=tierContainerRefs.current[idx]; const r=c?.getBoundingClientRect(); const m=16; const p=lastPosRef.current; const inside=!!(r&&p&& p.x>=r.left-m && p.x<=r.right+m && p.y>=r.top-m && p.y<=r.bottom+m); if(!inside){ if(hoverTierIndex===idx) setHoverTierIndex(null); setHoverInsertIndex(null); cachedRectsRef.current[idx]=null; if(rafRef.current){ cancelAnimationFrame(rafRef.current); rafRef.current=null; } pendingPosRef.current=null; lastPosRef.current=null; } }}
+                    onDrop={e=>{ if(hoverTierIndex===idx) setHoverTierIndex(null); setHoverInsertIndex(null); cachedRectsRef.current[idx]=null; if(rafRef.current){ cancelAnimationFrame(rafRef.current); rafRef.current=null; } pendingPosRef.current=null; lastPosRef.current=null; onDropToTier(e,idx); }}
+                    className="flex-1 min-h-[112px] rounded-2xl p-3 flex flex-wrap gap-3 relative overflow-visible"
+                  >
+                    {dragData && hoverTierIndex===idx && isPointInsideTier(idx) && (<div className={`pointer-events-none absolute inset-0 rounded-2xl ${isDark ? 'tier-inset-dark' : 'tier-inset-light'}`} />)}
+                    {tier.items.length===0 && !(dragData && hoverTierIndex===idx && isPointInsideTier(idx)) && (<div className={`rounded-xl px-3 py-6 border-2 border-dashed ${isDark?'border-white/10 text-white/40':'border-slate-200 text-slate-400'} text-sm`}>{t('dragHere')}</div>)}
+                    {(()=>{ const original=tier.items; const filtered=(dragData && dragData.from && dragData.from.tierIndex===idx && hoverTierIndex===idx)? original.filter(x=> x!==dragData.id) : original.slice(); const ghostAt=(dragData && hoverTierIndex===idx && isPointInsideTier(idx) && hoverInsertIndex!=null) ? Math.min(hoverInsertIndex, filtered.length) : null; const out=[]; for(let i=0;i<filtered.length;i++){ if(ghostAt===i && dragData && itemById[dragData.id]) out.push(<GhostPreview key="__ghost" item={itemById[dragData.id]} isDark={isDark} name={displayName(itemById[dragData.id])}/>); const id=filtered[i]; out.push(<DraggableItem key={id} item={itemById[id]} index={i} onDragStart={(e)=> onDragStart(e,{id, from:{tierIndex:idx,index:i}})} justPopped={justPoppedId===id} isDark={isDark} isDragging={dragData?.id===id} name={displayName(itemById[id])} />); } if(ghostAt===filtered.length && dragData && itemById[dragData.id]) out.push(<GhostPreview key="__ghost" item={itemById[dragData.id]} isDark={isDark} name={displayName(itemById[dragData.id])}/>); return out; })()}
                   </div>
                 </div>
-
-                {/* Drop zone */}
-                <div
-                  ref={el=> (tierContainerRefs.current[idx]=el)} data-tier-index={idx}
-                  onDragOver={e=>{
-                    onDragOver(e);
-                    pendingPosRef.current = { idx, x: e.clientX, y: e.clientY };
-                    if(!rafRef.current){
-                      rafRef.current = requestAnimationFrame(()=>{
-                        rafRef.current=null;
-                        const p = pendingPosRef.current; if(!p) return;
-                        const { idx:xIdx, x, y } = p;
-                        setHoverTierIndex(xIdx);
-                        const c = tierContainerRefs.current[xIdx];
-                        let i = computeInsertIndex(c, x, y, (dragData && dragData.from && dragData.from.tierIndex===xIdx)? dragData.id : null);
-                        setHoverInsertIndex(i);
-                        lastPosRef.current = {x,y};
-                        pendingPosRef.current = null;
-                      });
-                    }
-                  }}
-                  onDragLeave={()=> { 
-                    const c = tierContainerRefs.current[idx];
-                    const r = c?.getBoundingClientRect();
-                    const m = 16;
-                    const p = lastPosRef.current;
-                    const inside = !!(r && p && p.x >= r.left - m && p.x <= r.right + m && p.y >= r.top - m && p.y <= r.bottom + m);
-                    if(!inside){
-                      if(hoverTierIndex===idx) setHoverTierIndex(null);
-                      setHoverInsertIndex(null);
-                      cachedRectsRef.current[idx]=null;
-                      if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current=null; }
-                      pendingPosRef.current=null;
-                      lastPosRef.current=null;
-                    }
-                  }}
-                  onDrop={e=>{ if(hoverTierIndex===idx) setHoverTierIndex(null); setHoverInsertIndex(null); cachedRectsRef.current[idx]=null; if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current=null; } pendingPosRef.current=null; lastPosRef.current=null; onDropToTier(e,idx); }}
-                  className="flex-1 min-h-[112px] rounded-2xl p-3 flex flex-wrap gap-3 relative overflow-visible"
-                >
-                  {dragData && hoverTierIndex===idx && isPointInsideTier(idx) && (<div className={`pointer-events-none absolute inset-0 rounded-2xl ${isDark ? 'tier-inset-dark' : 'tier-inset-light'}`} />)}
-                  {tier.items.length===0 && !(dragData && hoverTierIndex===idx && isPointInsideTier(idx)) && (<div className={`rounded-xl px-3 py-6 border-2 border-dashed ${isDark?'border-white/10 text-white/40':'border-slate-200 text-slate-400'} text-sm`}>{t('dragHere')}</div>)}
-                  {(() => { 
-                    const original = tier.items;
-                    const filtered = (dragData && dragData.from && dragData.from.tierIndex===idx && hoverTierIndex===idx)
-                      ? original.filter(x=> x!==dragData.id)
-                      : original.slice();
-                    const ghostAt = (dragData && hoverTierIndex===idx && isPointInsideTier(idx) && hoverInsertIndex!=null) ? Math.min(hoverInsertIndex, filtered.length) : null;
-                    const out = [];
-                    for(let i=0;i<filtered.length;i++){
-                      if(ghostAt===i && dragData && itemById[dragData.id]) out.push(<GhostPreview key="__ghost" item={itemById[dragData.id]} isDark={isDark} showNames={showNames} name={displayName(itemById[dragData.id])} />);
-                      const id = filtered[i];
-                      out.push(
-                        <DraggableItem
-                          key={id}
-                          item={itemById[id]}
-                          index={i}
-                          onDragStart={(e)=> onDragStart(e,{id, from:{tierIndex:idx,index:i}})}
-                          justPopped={justPoppedId===id}
-                          isDark={isDark}
-                          isDragging={dragData?.id===id}
-                          showNames={showNames}
-                          name={displayName(itemById[id])}
-                          onRename={newName=> {
-                            setItems(prev=> prev.map(it=> it.id===id? {...it, label:newName, nameMap:{en:newName,ko:newName,ja:newName,zh:newName}}: it))
-                          }}
-                          onDelete={()=>{ setItems(prev=> prev.filter(it=> it.id!==id)); setTiers(prev=> prev.map((t,i2)=> i2===idx? {...t,items:t.items.filter(x=> x!==id)}: t)); }}
-                        />
-                      );
-                    }
-                    if(ghostAt===filtered.length && dragData && itemById[dragData.id]) out.push(<GhostPreview key="__ghost" item={itemById[dragData.id]} isDark={isDark} showNames={showNames} name={displayName(itemById[dragData.id])} />);
-                    return out;
-                  })()}
-                </div>
               </div>
-            </div>
-          ))}
-        </section>
-</div>
+            ))}
+          </section>
+        </div>
       </main>
 
       <style>{`
         .item-card { position: relative; width: var(--w,78px); height: var(--h,115px); border-radius: 12px; display: flex; flex-direction: column; overflow: visible; }
-        .item-card.square { --h: var(--w,78px); }
         .item-img { width: 100%; height: 78px; overflow: hidden; border-top-left-radius: 12px; border-top-right-radius: 12px; }
-        .item-card.square .item-img { height: 100%; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; }
         .item-card .img-el { width: 100%; height: 100%; object-fit: cover; }
         .item-name { height: 32px; display: grid; place-items: center; padding: 2px 4px 0px; font-weight: 800; text-align: center; line-height: 1.05; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; backdrop-filter: saturate(120%) blur(2px); overflow: hidden; }
         .item-card:after { content: ""; position: absolute; inset: -1px; border-radius: 18px; pointer-events: none; opacity: 0; transition: opacity .2s ease; background: radial-gradient(120px 80px at var(--mx,50%) var(--my,50%), rgba(255,255,255,.15), transparent 50%); }
         .item-card:hover:after { opacity: 1; }
         .animate-pop { animation: pop .4s cubic-bezier(.2,1,.4,1); }
-        @keyframes pop { 0% { transform: scale(.92); } 60% { transform: scale(1.06); } 100% { transform: scale(1); } }
+        @keyframes pop { 0% { transform: scale(.92) } 60% { transform: scale(1.06) } 100% { transform: scale(1) } }
+        @keyframes bubble { 0% { transform: translateY(0) scale(1); opacity: .8 } 50% { transform: translateY(-6px) scale(1.05); opacity: 1 } 100% { transform: translateY(0) scale(1); opacity: .8 } }
+        .tier-inset-light { box-shadow: inset 0 10px 24px rgba(0,0,0,0.08), inset 0 -10px 24px rgba(0,0,0,0.06), inset 0 0 0 2px rgba(0,0,0,0.03); background: radial-gradient(120% 60% at 50% 40%, rgba(255,255,255,0.55), rgba(255,255,255,0) 70%); }
+        .tier-inset-dark  { box-shadow: inset 28px 0 36px rgba(255,255,255,0.08), inset -28px 0 36px rgba(255,255,255,0.08), inset 0 0 0 1px rgba(255,255,255,0.10); background: transparent; }
 
-        /* ===== GAME EFFECT sparkles ===== */
-        @keyframes sparkleMove {
-          0%   { transform: translate(0,0) rotate(var(--rot,0)) scale(.7); opacity: 1; }
-          60%  { opacity: 1; }
-          100% { transform: translate(var(--dx), var(--dy)) rotate(calc(var(--rot,0) + 20deg)) scale(1.1); opacity: 0; }
-        }
+        /* Game sparkle */
+        @keyframes sparkleMove { 0% { transform: translate(0,0) rotate(var(--rot,0)) scale(.7); opacity: 1 } 60% { opacity: 1 } 100% { transform: translate(var(--dx), var(--dy)) rotate(calc(var(--rot,0) + 20deg)) scale(1.1); opacity: 0 } }
         .sparkle { position: fixed; pointer-events: none; will-change: transform, opacity; }
         .sparkle.star { width: var(--size,18px); height: var(--size,18px); animation: sparkleMove 700ms ease-out forwards; mix-blend-mode: screen; }
         .sparkle.star .glow { filter: drop-shadow(0 0 8px rgba(255,215,64,.95)) drop-shadow(0 0 18px rgba(245,158,11,.55)); }
         .sparkle.dust { width: var(--size,8px); height: var(--size,8px); border-radius: 50%; background: radial-gradient(circle, #fff8e1 0%, #fde047 50%, transparent 70%); animation: sparkleMove 800ms ease-out forwards; filter: drop-shadow(0 0 6px rgba(251,191,36,.9)) drop-shadow(0 0 14px rgba(245,158,11,.45)); mix-blend-mode: screen; }
 
-        @keyframes bubble { 0% { transform: translateY(0) scale(1); opacity: .8 } 50% { transform: translateY(-6px) scale(1.05); opacity: 1 } 100% { transform: translateY(0) scale(1); opacity: .8 } }
-        .tier-inset-light { box-shadow: inset 0 10px 24px rgba(0,0,0,0.08), inset 0 -10px 24px rgba(0,0,0,0.06), inset 0 0 0 2px rgba(0,0,0,0.03); background: radial-gradient(120% 60% at 50% 40%, rgba(255,255,255,0.55), rgba(255,255,255,0) 70%); }
-        .tier-inset-dark  { 
-          box-shadow:
-            inset 28px 0 36px rgba(255,255,255,0.08),
-            inset -28px 0 36px rgba(255,255,255,0.08),
-            inset 0 0 0 1px rgba(255,255,255,0.10);
-          background: transparent;
-        }
-        .ghost-card{opacity:.65; outline-offset:-2px;}
-
-        /* spinner */
-        .spin { animation: spin 1s linear infinite; }
-        @keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }
-
-        /* modal */
+        .spin { animation: spin 1s linear infinite }
+        @keyframes spin { from { transform: rotate(0) } to { transform: rotate(360deg) } }
         .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: grid; place-items: center; z-index: 80; }
-
-        /* Lang picker animation */
         .lang-pop { transform-origin: top right; transition: transform .18s ease, opacity .18s ease; }
-        .lang-pop.open { transform: scale(1); opacity: 1; }
-        .lang-pop.closed { transform: scale(.85); opacity: 0; pointer-events: none; }
-
-        /* Toasts */
+        .lang-pop.open { transform: scale(1); opacity: 1 }
+        .lang-pop.closed { transform: scale(.85); opacity: 0; pointer-events: none }
         .toast { animation: toastIn .18s ease-out, toastOut .22s ease-in forwards; }
         .toast[data-life="short"] { animation-delay: 0s, 2.3s; }
         @keyframes toastIn { from { transform: translateY(-6px); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
@@ -885,55 +599,49 @@ export default function TierListApp() {
   );
 }
 
-/* --------- Components --------- */
-
-function DraggableItem({ item, onDragStart, justPopped, index, isDark, onRename, onDelete, isDragging, showNames, name }){
-const ref = useRef(null);
-const [open,setOpen] = useState(false);
-useEffect(()=>{
-const onDoc=e=>{ if(ref.current && !ref.current.contains(e.target)) setOpen(false); };
-const onKey=e=>{ if(e.key==='Escape') setOpen(false); };
-document.addEventListener('click',onDoc);
-document.addEventListener('keydown',onKey);
-return ()=>{
-document.removeEventListener('click',onDoc);
-document.removeEventListener('keydown',onKey);
-};
-},[]);
-
-
-const square = !showNames;
-
-
-return (
-<div
-ref={ref}
-data-role="card"
-data-id={item.id}
-onContextMenu={e=>{ e.preventDefault(); setOpen(true); }}
-draggable
-onDragStart={e=>{
-onDragStart && onDragStart(e);
-const r=ref.current?.getBoundingClientRect();
-if(r){
-e.currentTarget.style.setProperty('--mx', `${e.clientX-r.left}px`);
-e.currentTarget.style.setProperty('--my', `${e.clientY-r.top}px`);
+/* =============================================================
+   Card components
+   ============================================================= */
+function DraggableItem({ item, onDragStart, justPopped, index, isDark, onRename, onDelete, isDragging, name }){
+  const ref = useRef(null);
+  const [open,setOpen] = useState(false);
+  useEffect(()=>{ const onDoc=e=>{ if(ref.current && !ref.current.contains(e.target)) setOpen(false); }; const onKey=e=>{ if(e.key==='Escape') setOpen(false); }; document.addEventListener('click',onDoc); document.addEventListener('keydown',onKey); return ()=>{ document.removeEventListener('click',onDoc); document.removeEventListener('keydown',onKey); }; },[]);
+  return (
+    <div
+      ref={ref}
+      data-role="card"
+      data-id={item.id}
+      onContextMenu={e=>{ e.preventDefault(); setOpen(true); }}
+      draggable
+      onDragStart={e=>{ onDragStart && onDragStart(e); const r=ref.current?.getBoundingClientRect(); if(r){ e.currentTarget.style.setProperty('--mx', `${e.clientX-r.left}px`); e.currentTarget.style.setProperty('--my', `${e.clientY-r.top}px`);} }}
+      className={`item-card group select-none border shadow-lg hover:-translate-y-0.5 transition transform ${justPopped?'animate-pop':''} ${isDark?'bg-slate-800/80 border-white/10':'bg-white/90 border-slate-200'} ${isDragging?'opacity-50':''}`}
+    >
+      {open && (
+        <div className={`absolute top-9 right-1 z-[80] rounded-xl border p-2 w-40 shadow-xl ${isDark?'bg-slate-800 text-white border-white/10':'bg-white text-slate-900 border-slate-200'}`}>
+          <button onClick={()=> onRename && onRename(prompt('Rename to?', name) || name)} className="block w-full text-left px-2 py-1 rounded-lg hover:bg-black/5">Rename</button>
+          <button onClick={()=> onDelete && onDelete()} className="block w-full text-left px-2 py-1 rounded-lg hover:bg-black/5 text-rose-500">Delete</button>
+        </div>
+      )}
+      <div className="item-img"><img src={item.image} alt={item.label} className="img-el"/></div>
+      <div className={`item-name ${isDark?'bg-slate-700/80 text-white':'bg-slate-100 text-slate-900'}`}>{name}</div>
+    </div>
+  );
 }
-}}
-className={`item-card ${square?'square':''} group select-none border shadow-lg hover:-translate-y-0.5 transition transform ${justPopped?'animate-pop':''} ${isDark?'bg-slate-800/80 border-white/10':'bg-white/90 border-slate-200'} ${isDragging?'opacity-50':''}`}
->
-{open && (
-<div className={`absolute top-9 right-1 z-[80] rounded-xl border p-2 w-40 bg-white shadow-xl ${isDark?'bg-slate-800 text-white':'text-slate-900'}`}>
-<button onClick={()=> onRename && onRename(prompt('Rename to?', name) || name)} className="block w-full text-left px-2 py-1 hover:bg-slate-200">Rename</button>
-<button onClick={()=> onDelete && onDelete()} className="block w-full text-left px-2 py-1 hover:bg-slate-200 text-rose-500">Delete</button>
-</div>
-)}
 
+function GhostPreview({ item, isDark, name }){
+  return (
+    <div className={`item-card group select-none border dashed ghost-card ${isDark?'bg-slate-800/50 border-white/20':'bg-white/60 border-slate-300'} `}>
+      <div className="item-img"><img src={item.image} alt={item.label} className="img-el"/></div>
+      <div className={`item-name ${isDark?'bg-slate-700/60 text-white/80':'bg-slate-100/80 text-slate-700'}`}>{name}</div>
+    </div>
+  );
+}
 
-<div className="item-img"><img src={item.image} alt={item.label} className="img-el"/></div>
-{showNames && (
-<div className={`item-name ${isDark?'bg-slate-700/80 text-white':'bg-slate-100 text-slate-900'}`}>{name}</div>
-)}
-</div>
-);
+function NameToggle({ isDark }){
+  const [show, setShow] = useState(true);
+  useEffect(()=>{ document.querySelectorAll('.item-card').forEach(el=> el.classList.toggle('square', !show)); },[show]);
+  useEffect(()=>{ const root=document.getElementById('tierlist-capture'); if(!root) return; root.querySelectorAll('.item-name').forEach(el=>{ el.style.display = show? 'grid':'none'; }); },[show]);
+  return (
+    <button type="button" onClick={()=> setShow(v=>!v)} className={`px-3 py-2 rounded-xl border text-sm ${isDark?'bg-white/10 border-white/10 text-white':'bg-white border-slate-200 text-slate-900'}`}>{show? 'Hide Names':'Show Names'}</button>
+  );
 }
