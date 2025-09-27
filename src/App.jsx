@@ -201,6 +201,31 @@ export default function TierListApp() {
   const [justPoppedId, setJustPoppedId] = useState(null);
   const [sparkles, setSparkles] = useState([]);
   const [sweeps, setSweeps] = useState([]);
+    const triggerPerimeterSparkles = React.useCallback((rect) => {
+    const id = uid();
+    const { left, top, width: w, height: h } = rect;
+    const perimeter = 2 * (w + h);
+    const N = Math.max(24, Math.round(perimeter * 0.12));
+    const items = [];
+    for (let i = 0; i < N; i++) {
+      const t = i / N;
+      let px, py, nx, ny;
+      const d = t * perimeter;
+      if (d < w) { px = left + d; py = top; nx = 0; ny = -1; }
+      else if (d < w + h) { px = left + w; py = top + (d - w); nx = 1; ny = 0; }
+      else if (d < 2*w + h) { px = left + (2*w + h - d); py = top + h; nx = 0; ny = 1; }
+      else { px = left; py = top + (perimeter - d); nx = -1; ny = 0; }
+      const a = Math.atan2(ny, nx) + (Math.random() * 0.8 - 0.4);
+      const dist = 14 + Math.random() * 34;
+      items.push({ id: `${id}-pd-${i}`, layer: "back", type: "dust", x: px, y: py, angle: a, dist,
+        size: 1.6 + Math.random()*2.2, life: 900 + Math.random()*280, createdAt: Date.now(), delay: Math.floor(Math.random()*140) });
+    }
+    setSparkles(prev => [...prev, ...items]);
+  }, []);
+const addSweep = React.useCallback((left, top, w, h, radius=12) => {
+    setSweeps(prev => [...prev, { id: uid(), x:left, y:top, w, h, r: radius, createdAt: Date.now() }]);
+  }, []);
+
   const addSweep = React.useCallback((left, top, w, h, radius = 12) => {
     setSweeps(prev => [...prev, { id: uid(), x: left, y: top, w, h, r: radius, createdAt: Date.now() }]);
   }, []);
@@ -433,7 +458,7 @@ export default function TierListApp() {
     return p.x >= r.left - margin && p.x <= r.right + margin && p.y >= r.top - margin && p.y <= r.bottom + margin;
   };
 
-function triggerSparkles(){ /* disabled: replaced by triggerPerimeterSparkles */ }
+/* triggerSparkles disabled */
   const [editingTierIndex,setEditingTierIndex]=useState(null);
   const [editingTierValue,setEditingTierValue]=useState('');
   function startEditTier(i){ setEditingTierIndex(i); setEditingTierValue(tiers[i].name); }
@@ -907,55 +932,13 @@ function triggerSparkles(){ /* disabled: replaced by triggerPerimeterSparkles */
   );
 }
 
-
-function triggerPerimeterSparkles(rect) {
-  const id = uid();
-  const { left, top, width: w, height: h } = rect;
-  const perimeter = 2 * (w + h);
-  const N = Math.max(24, Math.round(perimeter * 0.12)); // density along edge
-  const items = [];
-
-  for (let i = 0; i < N; i++) {
-    const t = i / N; // 0..1 along the rectangle perimeter, clockwise
-    let px, py, nx, ny;
-    const d = t * perimeter;
-    if (d < w) { // top edge (left→right)
-      px = left + d; py = top; nx = 0; ny = -1;
-    } else if (d < w + h) { // right edge (top→bottom)
-      px = left + w; py = top + (d - w); nx = 1; ny = 0;
-    } else if (d < 2*w + h) { // bottom edge (right→left)
-      px = left + (2*w + h - d); py = top + h; nx = 0; ny = 1;
-    } else { // left edge (bottom→top)
-      px = left; py = top + (perimeter - d); nx = -1; ny = 0;
-    }
-
-    // outward-biased direction with jitter
-    const a = Math.atan2(ny, nx) + (Math.random() * 0.8 - 0.4);
-    const dist = 14 + Math.random() * 34; // spread from the edge
-
-    items.push({
-      id: `${id}-pd-${i}`,
-      layer: 'back',
-      type: 'dust',
-      x: px, y: py, angle: a, dist,
-      size: 1.6 + Math.random()*2.2,
-      life: 900 + Math.random()*280,
-      createdAt: Date.now(),
-      delay: Math.floor(Math.random()*140)
-    });
-  }
-
-  setSparkles(prev => [...prev, ...items]);
-}
-
-
 /* --------- Components --------- */
 
 function SweepGlow({ x, y, w, h, r }) {
   const id = React.useMemo(() => uid(), []);
   const len = (w + h) * 2;
   return (
-    <svg className="fixed pointer-events-none" style={{ left: x, top: y, width: w, height: h, overflow: 'visible' }} viewBox={`0 0 ${w} ${h}`} aria-hidden>
+    <svg className="fixed pointer-events-none" style={{ left: x, top: y, width: w, height: h }} viewBox={`0 0 ${w} ${h}`} aria-hidden>
       <defs>
         <linearGradient id={`lg-${id}`} x1="0" y1="0" x2="1" y2="0">
           <stop offset="0%" stopColor="#fff8e1" stopOpacity="0"/>
@@ -973,8 +956,7 @@ function SweepGlow({ x, y, w, h, r }) {
   );
 }
 
-function addSweep(left, top, w, h, radius=12){
-  setSweeps(prev => [...prev, { id: uid(), x:left, y:top, w, h, r: radius, createdAt: Date.now() }]);
+]);
 }
 
 
