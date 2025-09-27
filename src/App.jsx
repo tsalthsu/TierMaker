@@ -840,7 +840,14 @@ function triggerSparkles(x, y) {
                   className="flex-1 min-h-[112px] rounded-2xl p-3 flex flex-wrap gap-3 relative overflow-visible"
                 >
                   {dragData && hoverTierIndex===idx && isPointInsideTier(idx) && (<div className={`pointer-events-none absolute inset-0 rounded-2xl ${isDark ? 'tier-inset-dark' : 'tier-inset-light'}`} />)}
-                  {tier.items.length===0 && !(dragData && hoverTierIndex===idx && isPointInsideTier(idx)) && (<div className={`rounded px-3 py-6 border-2 border-dashed ${isDark?'border-white/10 text-white/40':'border-slate-200 text-slate-400'} text-sm`}>{t('dragHere')}</div>)}
+                  {tier.items.length===0 && !(dragData && hoverTierIndex===idx && isPointInsideTier(idx)) && (
+  <div
+    data-export-hide="true"   // << 추가
+    className={`rounded-xl px-3 py-6 border-2 border-dashed ${isDark?'border-white/10 text-white/40':'border-slate-200 text-slate-400'} text-sm`}
+  >
+    {t('dragHere')}
+  </div>
+)}
                   {(() => { 
                     const original = tier.items;
                     const filtered = (dragData && dragData.from && dragData.from.tierIndex===idx && hoverTierIndex===idx)
@@ -947,6 +954,10 @@ function triggerSparkles(x, y) {
         .sweep-stroke { animation: sweep 700ms ease-out forwards; }
 
 `}
+
+        html.exporting * { box-shadow: none !important; filter: none !important; }
+        html.exporting .sparkle, html.exporting .sweep-stroke { display: none !important; } /* 효과 숨김 */
+        html.exporting .tier-inset-light, html.exporting .tier-inset-dark { display: none !important; } /* 호버 인셋 숨김 */
 </style>
     </div>
   );
