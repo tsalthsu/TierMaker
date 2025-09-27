@@ -791,19 +791,19 @@ const addSweep = React.useCallback((left, top, w, h, radius=12) => {
                       });
                     }
                   }}
-                  onDragLeave={()=> { 
+                  onDragLeave={() => { 
                     const c = tierContainerRefs.current[idx];
                     const r = c?.getBoundingClientRect();
                     const m = 16;
                     const p = lastPosRef.current;
                     const inside = !!(r && p && p.x >= r.left - m && p.x <= r.right + m && p.y >= r.top - m && p.y <= r.bottom + m);
-                    if(!inside){
-                      if(hoverTierIndex===idx) setHoverTierIndex(null);
+                    if (!inside) {
+                      if (hoverTierIndex === idx) setHoverTierIndex(null);
                       setHoverInsertIndex(null);
-                      cachedRectsRef.current[idx]=null;
-                      if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current=null; }
-                      pendingPosRef.current=null;
-                      lastPosRef.current=null;
+                      cachedRectsRef.current[idx] = null;
+                      if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+                      pendingPosRef.current = null;
+                      lastPosRef.current = null;
                     }
                   }}
                   onDrop={e=>{ if(hoverTierIndex===idx) setHoverTierIndex(null); setHoverInsertIndex(null); cachedRectsRef.current[idx]=null; if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current=null; } pendingPosRef.current=null; lastPosRef.current=null; onDropToTier(e,idx); }}
