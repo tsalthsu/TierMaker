@@ -1161,7 +1161,6 @@ function BlobButton({children,onClick,disabled,loading}){
         )}
         {children}
       </span>
-      <span className="absolute inset-0 overflow-hidden rounded-2xl">
       </span>
     </button>
   );
