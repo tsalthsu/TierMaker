@@ -339,6 +339,7 @@ export default function TierListApp() {
       const r = card.getBoundingClientRect();
       const cx = r.left + r.width / 2;
       const cy = r.top + r.height / 2;
+      addSweep(r.left, r.top, r.width, r.height, 12);
       triggerSparkles(cx, cy);
     } else {
       // 혹시 못 찾았을 때는 임시로 마우스 좌표
@@ -430,49 +431,42 @@ export default function TierListApp() {
 function triggerSparkles(x, y) {
   const id = uid();
 
-  // 링 먼지
-  const ringN = 24;
-  const ring = Array.from({ length: ringN }).map((_, i) => {
+  // --- BACK layer (behind cards): dense ring + dust + big flare ---
+  const ringN = 36;
+  const dustN = 60;
+
+  const backRing = Array.from({ length: ringN }).map((_, i) => {
     const a = (Math.PI * 2 * i) / ringN + (Math.random() * 0.3 - 0.15);
-    const dist = 42 + Math.random() * 6;
-    return { id: `${id}-r-${i}`, x, y, angle: a, dist,
-      size: 1.8 + Math.random() * 1.6, type: 'dust',
-      life: 950 + Math.random() * 200, createdAt: Date.now(),
-      delay: Math.floor(Math.random() * 120), twinkle: true };
+    const dist = 70 + Math.random() * 30; // larger radius
+    return { id: `${id}-br-${i}`, layer: 'back', type: 'dust', x, y, angle: a, dist,
+      size: 2 + Math.random()*2, life: 1000 + Math.random()*250, createdAt: Date.now(), delay: Math.floor(Math.random()*120) };
   });
 
-  // 주변 금먼지
-  const dustN = 26;
-  const dust = Array.from({ length: dustN }).map((_, i) => {
+  const backDust = Array.from({ length: dustN }).map((_, i) => {
     const a = Math.random() * Math.PI * 2;
-    const dist = 20 + Math.random() * 36;
-    return { id: `${id}-d-${i}`, x, y, angle: a, dist,
-      size: 1.4 + Math.random() * 2.2, type: 'dust',
-      life: 800 + Math.random() * 260, createdAt: Date.now(),
-      delay: Math.floor(Math.random() * 160), twinkle: Math.random() < 0.6 };
+    const dist = 40 + Math.random() * 60;
+    return { id: `${id}-bd-${i}`, layer: 'back', type: 'dust', x, y, angle: a, dist,
+      size: 1.6 + Math.random()*2.4, life: 900 + Math.random()*280, createdAt: Date.now(), delay: Math.floor(Math.random()*160) };
   });
 
-  // 플레어(작은 것 2 + 큰 것 1 보장)
-  const smallFlares = Array.from({ length: 2 }).map((_, i) => {
-    const a = Math.random() * Math.PI * 2;
-    const dist = 34 + Math.random() * 14;
-    return { id: `${id}-fs-${i}`, x, y, angle: a, dist,
-      size: 8 + Math.random() * 3, type: 'flare',
-      life: 1200 + Math.random() * 200, createdAt: Date.now(),
-      delay: 60 + Math.floor(Math.random() * 120), rotate: (Math.random()*16-8) };
-  });
-
-  // **큰 플레어 1개** (항상 생성)
-  const bigAngle = Math.random() * Math.PI * 2;
-  const bigFlare = {
-    id: `${id}-fb-0`, x, y, angle: bigAngle, dist: 36 + Math.random() * 10,
-    size: 15 + Math.random() * 4, type: 'flare',
-    life: 1400 + Math.random() * 250, createdAt: Date.now(),
-    delay: 20 + Math.floor(Math.random() * 60), rotate: (Math.random()*20-10), power: 1
+  const backFlare = {
+    id: `${id}-bf-0`, layer: 'back', type: 'flare', x, y,
+    angle: Math.random()*Math.PI*2, dist: 60 + Math.random()*20,
+    size: 18 + Math.random()*6, rotate: (Math.random()*20-10), power: 1,
+    life: 1400 + Math.random()*260, createdAt: Date.now(), delay: 30 + Math.floor(Math.random()*90)
   };
 
-  setSparkles(prev => [...prev, ...ring, ...dust, ...smallFlares, bigFlare]);
+  // --- FRONT layer (accent): optional small flare ---
+  const frontFlare = Math.random()<0.6 ? [{
+    id: `${id}-ff-0`, layer: 'front', type: 'flare', x, y,
+    angle: Math.random()*Math.PI*2, dist: 45 + Math.random()*14,
+    size: 10 + Math.random()*4, rotate: (Math.random()*16-8),
+    life: 1100 + Math.random()*220, createdAt: Date.now(), delay: 80 + Math.floor(Math.random()*120)
+  }] : [];
+
+  setSparkles(prev => [...prev, ...backRing, ...backDust, backFlare, ...frontFlare]);
 }
+
 
 
   const [editingTierIndex,setEditingTierIndex]=useState(null);
@@ -592,7 +586,20 @@ function triggerSparkles(x, y) {
   return (
     <div className={`${isDark?'text-white':'text-slate-900'} min-h-screen transition-colors duration-300 ${isDark?'bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800':'bg-gradient-to-br from-slate-100 via-white to-slate-100'}`}>
       <GooDefs/>
-      <div ref={overlayRef} className="pointer-events-none fixed inset-0 z-50">{sparkles.map(s=> <Sparkle key={s.id} x={s.x} y={s.y} angle={s.angle} dist={s.dist}/> )}</div>
+{/* Back layer (behind cards) */}
+<div className="pointer-events-none fixed inset-0 z-0">
+  {sparkles.filter(s => s.layer === 'back').map(s => (
+    <Sparkle key={s.id} {...s} />
+  ))}
+</div>
+
+{/* Front layer (sweep/flare accent) */}
+<div className="pointer-events-none fixed inset-0 z-40">
+  {sweeps.map(sw => <SweepGlow key={sw.id} {...sw} />)}
+  {sparkles.filter(s => s.layer === 'front').map(s => (
+    <Sparkle key={s.id} {...s} />
+  ))}
+</div>
 
       {/* Theme toggle moved to bottom-left */}
       <ThemeToggle isDark={isDark} onToggle={()=> setTheme(isDark?'light':'dark')} position="bl" />
@@ -707,7 +714,7 @@ function triggerSparkles(x, y) {
         </div>
       </header>
 
-      <main id="tierboard" className="mx-auto max-w-[1400px] px-4 py-6">
+      <main id="tierboard" className="relative z-10 mx-auto max-w-[1400px] px-4 py-6">
         {/* Upload */}
         <section className="mb-6">
           <div
@@ -919,12 +926,43 @@ function triggerSparkles(x, y) {
         .toast[data-life="short"] { animation-delay: 0s, 2.3s; }
         @keyframes toastIn { from { transform: translateY(-6px); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
         @keyframes toastOut { to { transform: translateY(-6px); opacity: 0 } }
-      `}</style>
+      `}
+        /* Sweep stroke animation */
+        @keyframes sweep { from { stroke-dashoffset: 0; opacity: 0 } 10% { opacity: 1 } 80% { opacity: 1 } to { stroke-dashoffset: -100%; opacity: 0 } }
+        .sweep-stroke { animation: sweep 700ms ease-out forwards; }
+</style>
     </div>
   );
 }
 
 /* --------- Components --------- */
+
+function SweepGlow({ x, y, w, h, r }) {
+  const id = React.useMemo(() => uid(), []);
+  const len = (w + h) * 2;
+  return (
+    <svg className="fixed pointer-events-none" style={{ left: x, top: y, width: w, height: h }} viewBox={`0 0 ${w} ${h}`} aria-hidden>
+      <defs>
+        <linearGradient id={`lg-${id}`} x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="#fff8e1" stopOpacity="0"/>
+          <stop offset="20%" stopColor="#fde047" stopOpacity="1"/>
+          <stop offset="60%" stopColor="#f59e0b" stopOpacity=".8"/>
+          <stop offset="100%" stopColor="#f59e0b" stopOpacity="0"/>
+        </linearGradient>
+        <filter id={`fg-${id}`} x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="1.5" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+      <rect x="0" y="0" width={w} height={h} rx={r} ry={r} fill="none" stroke={`url(#lg-${id})`} strokeWidth="3" pathLength={len} strokeDasharray={`${len/6} ${len}`} className="sweep-stroke" filter={`url(#fg-${id})`} style={{ mixBlendMode: "screen" }} />
+    </svg>
+  );
+}
+
+function addSweep(left, top, w, h, radius=12){
+  setSweeps(prev => [...prev, { id: uid(), x:left, y:top, w, h, r: radius, createdAt: Date.now() }]);
+}
+
 
 function DraggableItem({ item, onDragStart, justPopped, index, isDark, onRename, onDelete, isDragging, showNames, name }){
   const ref = useRef(null);
