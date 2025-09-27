@@ -186,9 +186,8 @@ export default function TierListApp() {
     { name: 'B', color: '#fbbf24', items: [] },
     { name: 'C', color: '#f97316', items: [] },
     { name: 'D', color: '#ef4444', items: [] },
-  ]);
-
-  // keep refs size in sync with tiers length
+  );
+// keep refs size in sync with tiers length
   const tierContainerRefs = useRef({});
   useEffect(() => {
     const next = {};
@@ -225,10 +224,7 @@ export default function TierListApp() {
 const addSweep = React.useCallback((left, top, w, h, radius=12) => {
     setSweeps(prev => [...prev, { id: uid(), x:left, y:top, w, h, r: radius, createdAt: Date.now() }]);
   }, []);
-
-  const addSweep = React.useCallback((left, top, w, h, radius = 12) => {
-    setSweeps(prev => [...prev, { id: uid(), x: left, y: top, w, h, r: radius, createdAt: Date.now() }]);
-  }, []);
+}, []);
   useEffect(() => {
   const t = setInterval(() => {
     setSparkles(prev => prev.filter(s => Date.now() - s.createdAt < (s.life || 1100)));
@@ -955,8 +951,7 @@ function SweepGlow({ x, y, w, h, r }) {
     </svg>
   );
 }
-
-]);
+  );
 }
 
 
