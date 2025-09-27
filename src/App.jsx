@@ -816,9 +816,9 @@ export default function TierListApp() {
         .animate-pop { animation: pop .4s cubic-bezier(.2,1,.4,1); }
         @keyframes pop { 0% { transform: scale(.92); } 60% { transform: scale(1.06); } 100% { transform: scale(1); } }
         @keyframes sparkle {
-  0%   { transform: translate(0,0) scale(.6); opacity: 1; }
+  0%   { transform: translate(0,0) scale(.6);  opacity: 1; }
   50%  { transform: translate(var(--dx), var(--dy)) scale(1.0); opacity: 1; }
-  100% { transform: translate(var(--dx), var(--dy)) scale(1.2); opacity: 0; }
+  100% { transform: translate(var(--dx), var(--dy)) scale(1.15); opacity: 0; }
 }
         /* ✦ 금빛 별 파티클 (네모 방지: 코어(원형) + 별팔은 자식에만 필터) */
 .sparkle {
@@ -826,62 +826,14 @@ export default function TierListApp() {
   width: 24px;
   height: 24px;
   pointer-events: none;
-  background: transparent !important; /* 부모는 완전 투명 */
-  transform: translate(0,0) scale(.75);
-  animation: sparkle 600ms ease-out forwards;
-  /* 부모에는 drop-shadow를 주지 않음(네모 현상 방지) */
+  background: transparent !important;
+  animation: sparkle 650ms ease-out forwards;
 }
 
-/* 코어(원형) – 진짜 금빛 점 */
-.sparkle::before {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 12px;
-  height: 12px;
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  background: radial-gradient(circle,
-    #fff8e1 0%,
-    #fde047 45%,
-    rgba(253,224,71,.0) 65%
-  );
-  /* 글로우는 코어에만 */
-  filter:
-    drop-shadow(0 0 8px rgba(251,191,36,.95))
-    drop-shadow(0 0 18px rgba(245,158,11,.55));
-}
-/* 별빛 팔(✦) – conic-gradient + 중앙 마스크로 팔만 보이게 */
-.sparkle::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background:
-    conic-gradient(
-      from 0deg,
-      transparent 0deg 14deg,  rgba(253,224,71,.95) 14deg 18deg,
-      transparent 18deg 72deg, rgba(253,224,71,.95) 72deg 76deg,
-      transparent 76deg 134deg,rgba(253,224,71,.95) 134deg 138deg,
-      transparent 138deg 196deg,rgba(253,224,71,.95) 196deg 200deg,
-      transparent 200deg 258deg,rgba(253,224,71,.95) 258deg 262deg,
-      transparent 262deg 320deg,rgba(253,224,71,.95) 320deg 324deg,
-      transparent 324deg 360deg
-    );
-  
-  /* 마스크를 흑백 논리값으로 명확히 */
-  -webkit-mask-image: radial-gradient(circle, rgba(0,0,0,0) 44%, rgba(0,0,0,1) 45%);
-  -webkit-mask-repeat: no-repeat;
-  -webkit-mask-position: center;
-  -webkit-mask-size: cover;
-  
-  mask-image: radial-gradient(circle, rgba(0,0,0,0) 44%, rgba(0,0,0,1) 45%);
-  mask-repeat: no-repeat;
-  mask-position: center;
-  mask-size: cover;
+.sparkle::before,
+.sparkle::after { content: none !important; }
+.sparkle-star { transform-origin: 50% 50%; }
 
-  filter: blur(.4px);
-}
         @keyframes bubble { 0% { transform: translateY(0) scale(1); opacity: .8 } 50% { transform: translateY(-6px) scale(1.05); opacity: 1 } 100% { transform: translateY(0) scale(1); opacity: .8 } }
         .tier-inset-light { box-shadow: inset 0 10px 24px rgba(0,0,0,0.08), inset 0 -10px 24px rgba(0,0,0,0.06), inset 0 0 0 2px rgba(0,0,0,0.03); background: radial-gradient(120% 60% at 50% 40%, rgba(255,255,255,0.55), rgba(255,255,255,0) 70%); }
         .tier-inset-dark  { 
@@ -1015,13 +967,45 @@ function FitText({ text, maxFont=20, minFont=10, maxLines=2 }){
 function Sparkle({ x, y, angle, dist }) {
   const dx = Math.cos(angle) * dist;
   const dy = Math.sin(angle) * dist;
+
+  // 중복되지 않는 gradient/filter id (여러 개 동시에 떠도 충돌 방지)
+  const gid = React.useMemo(() => 'g_' + uid(), []);
+  const fid = React.useMemo(() => 'f_' + uid(), []);
+
   return (
-    <div
-      className="sparkle"
+    <svg
+      className="sparkle sparkle-star"
       style={{ left: x, top: y, "--dx": `${dx}px`, "--dy": `${dy}px` }}
-    />
+      width="24" height="24" viewBox="0 0 24 24" aria-hidden
+    >
+      <defs>
+        <radialGradient id={gid} cx="50%" cy="50%" r="60%">
+          <stop offset="0%"  stopColor="#fff8e1" />
+          <stop offset="45%" stopColor="#fde047" />
+          <stop offset="100%" stopColor="#f59e0b" stopOpacity="0" />
+        </radialGradient>
+        <filter id={fid} x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="1.2" result="b" />
+          <feMerge>
+            <feMergeNode in="b" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
+
+      {/* 5각 별 */}
+      <polygon
+        points={starPoints(12, 12, 5, 9, 4)}
+        fill={`url(#${gid})`}
+        stroke="#fbbf24"
+        strokeWidth="1"
+        filter={`url(#${fid})`}
+        opacity="0.95"
+      />
+    </svg>
   );
 }
+
 
 /** Toast bubble */
 function Toast({msg, type='info', isDark}){
@@ -1163,4 +1147,22 @@ function uid(){ return Math.random().toString(36).slice(2,9)+Date.now().toString
 function clamp(n,a,b){ return Math.max(a, Math.min(b,n)); }
 function insertAt(arr,index,value){ const c=arr.slice(); c.splice(index,0,value); return c; }
 function randomNiceColor(){ const palette=["#60a5fa","#38bdf8","#22d3ee","#34d399","#a78bfa","#f472b6","#fbbf24","#f97316","#ef4444"]; return palette[Math.floor(Math.random()*palette.length)]; }
+// 5각 별 좌표 생성 (24x24 기준)
+function starPoints(cx, cy, spikes = 5, outer = 9, inner = 4) {
+  let rot = Math.PI / 2 * 3;
+  const step = Math.PI / spikes;
+  const pts = [];
+  for (let i = 0; i < spikes; i++) {
+    let x = cx + Math.cos(rot) * outer;
+    let y = cy + Math.sin(rot) * outer;
+    pts.push(`${x},${y}`);
+    rot += step;
+    x = cx + Math.cos(rot) * inner;
+    y = cy + Math.sin(rot) * inner;
+    pts.push(`${x},${y}`);
+    rot += step;
+  }
+  return pts.join(' ');
+}
+
 export { TierListApp as App };
