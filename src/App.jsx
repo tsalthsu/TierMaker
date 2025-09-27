@@ -903,15 +903,7 @@ function triggerSparkles(x, y) {
 /* SVG 내부의 원형먼지는 미세하게 반짝임(개별 delay는 inline) */
 .sparkle-dust circle { animation: twinkle 480ms ease-in-out infinite; }
 
-        @keyframes bubble { 0% { transform: translateY(0) scale(1); opacity: .8 } 50% { transform: translateY(-6px) scale(1.05); opacity: 1 } 100% { transform: translateY(0) scale(1); opacity: .8 } }
-        .tier-inset-light { box-shadow: inset 0 10px 24px rgba(0,0,0,0.08), inset 0 -10px 24px rgba(0,0,0,0.06), inset 0 0 0 2px rgba(0,0,0,0.03); background: radial-gradient(120% 60% at 50% 40%, rgba(255,255,255,0.55), rgba(255,255,255,0) 70%); }
-        .tier-inset-dark  { 
-          box-shadow:
-            inset 28px 0 36px rgba(255,255,255,0.08),
-            inset -28px 0 36px rgba(255,255,255,0.08),
-            inset 0 0 0 1px rgba(255,255,255,0.10);
-          background: transparent;
-        }
+        @keyframes bubble { }
         .ghost-card{opacity:.65; outline-offset:-2px;}
 
         /* spinner */
