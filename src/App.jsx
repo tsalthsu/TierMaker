@@ -430,59 +430,50 @@ export default function TierListApp() {
 function triggerSparkles(x, y) {
   const id = uid();
 
-  // 1) 링을 이루는 미세 파티클
+  // 링 먼지
   const ringN = 24;
   const ring = Array.from({ length: ringN }).map((_, i) => {
     const a = (Math.PI * 2 * i) / ringN + (Math.random() * 0.3 - 0.15);
-    const dist = 42 + Math.random() * 6;         // 링 두께
-    return {
-      id: `${id}-r-${i}`,
-      x, y, angle: a, dist,
-      size: 1.8 + Math.random() * 1.6,
-      type: 'dust',
-      life: 950 + Math.random() * 200,           // 0.95~1.15s
-      createdAt: Date.now(),
-      delay: Math.floor(Math.random() * 120),
-      twinkle: true
-    };
+    const dist = 42 + Math.random() * 6;
+    return { id: `${id}-r-${i}`, x, y, angle: a, dist,
+      size: 1.8 + Math.random() * 1.6, type: 'dust',
+      life: 950 + Math.random() * 200, createdAt: Date.now(),
+      delay: Math.floor(Math.random() * 120), twinkle: true };
   });
 
-  // 2) 주변에 흩어지는 금먼지(보케)
+  // 주변 금먼지
   const dustN = 26;
   const dust = Array.from({ length: dustN }).map((_, i) => {
     const a = Math.random() * Math.PI * 2;
-    const dist = 20 + Math.random() * 36;        // 중심~테두리
-    return {
-      id: `${id}-d-${i}`,
-      x, y, angle: a, dist,
-      size: 1.4 + Math.random() * 2.2,
-      type: 'dust',
-      life: 800 + Math.random() * 260,
-      createdAt: Date.now(),
-      delay: Math.floor(Math.random() * 160),
-      twinkle: Math.random() < 0.6
-    };
+    const dist = 20 + Math.random() * 36;
+    return { id: `${id}-d-${i}`, x, y, angle: a, dist,
+      size: 1.4 + Math.random() * 2.2, type: 'dust',
+      life: 800 + Math.random() * 260, createdAt: Date.now(),
+      delay: Math.floor(Math.random() * 160), twinkle: Math.random() < 0.6 };
   });
 
-  // 3) 강한 하이라이트 플레어 몇 개
-  const flareN = 3;
-  const flares = Array.from({ length: flareN }).map((_, i) => {
+  // 플레어(작은 것 2 + 큰 것 1 보장)
+  const smallFlares = Array.from({ length: 2 }).map((_, i) => {
     const a = Math.random() * Math.PI * 2;
-    const dist = 36 + Math.random() * 12;
-    return {
-      id: `${id}-f-${i}`,
-      x, y, angle: a, dist,
-      size: 9 + Math.random() * 4,    // 플레어 별 크기
-      type: 'flare',
-      life: 1100 + Math.random() * 300,
-      createdAt: Date.now(),
-      delay: 40 + Math.floor(Math.random() * 120),
-      rotate: (Math.random() * 12 - 6) // 약간 회전
-    };
+    const dist = 34 + Math.random() * 14;
+    return { id: `${id}-fs-${i}`, x, y, angle: a, dist,
+      size: 8 + Math.random() * 3, type: 'flare',
+      life: 1200 + Math.random() * 200, createdAt: Date.now(),
+      delay: 60 + Math.floor(Math.random() * 120), rotate: (Math.random()*16-8) };
   });
 
-  setSparkles(prev => [...prev, ...ring, ...dust, ...flares]);
+  // **큰 플레어 1개** (항상 생성)
+  const bigAngle = Math.random() * Math.PI * 2;
+  const bigFlare = {
+    id: `${id}-fb-0`, x, y, angle: bigAngle, dist: 36 + Math.random() * 10,
+    size: 15 + Math.random() * 4, type: 'flare',
+    life: 1400 + Math.random() * 250, createdAt: Date.now(),
+    delay: 20 + Math.floor(Math.random() * 60), rotate: (Math.random()*20-10), power: 1
+  };
+
+  setSparkles(prev => [...prev, ...ring, ...dust, ...smallFlares, bigFlare]);
 }
+
 
   const [editingTierIndex,setEditingTierIndex]=useState(null);
   const [editingTierValue,setEditingTierValue]=useState('');
@@ -1036,7 +1027,7 @@ function FitText({ text, maxFont=20, minFont=10, maxLines=2 }){
   return <span ref={ref} style={{display:'-webkit-box', WebkitLineClamp:maxLines, WebkitBoxOrient:'vertical', overflow:'hidden', width:'100%', height:'100%'}}>{text}</span>;
 }
 
-function Sparkle({ x, y, angle, dist, type='dust', size=2, delay=0, rotate=0 }) {
+function Sparkle({ x, y, angle, dist, type='dust', size=2, delay=0, rotate=0, power=0 }) {
   const dx = Math.cos(angle) * dist;
   const dy = Math.sin(angle) * dist;
 
@@ -1047,45 +1038,57 @@ function Sparkle({ x, y, angle, dist, type='dust', size=2, delay=0, rotate=0 }) 
     <svg
       className={`sparkle ${type==='flare' ? 'sparkle-flare' : 'sparkle-dust'}`}
       style={{ left: x, top: y, "--dx": `${dx}px`, "--dy": `${dy}px`, animationDelay: `${delay}ms` }}
-      width="24" height="24" viewBox="0 0 24 24" aria-hidden
+      width="28" height="28" viewBox="0 0 28 28" aria-hidden
     >
       <defs>
-        {/* 금빛 그라디언트 */}
         <radialGradient id={gid} cx="50%" cy="50%" r="60%">
           <stop offset="0%"  stopColor="#fff8e1" stopOpacity="1"/>
           <stop offset="45%" stopColor="#fde047" stopOpacity="0.95"/>
           <stop offset="100%" stopColor="#f59e0b" stopOpacity="0"/>
         </radialGradient>
-        {/* 부드러운 글로우 */}
-        <filter id={fid} x="-60%" y="-60%" width="220%" height="220%">
-          <feGaussianBlur stdDeviation="1.4" result="b"/>
-          <feMerge>
-            <feMergeNode in="b"/>
-            <feMergeNode in="SourceGraphic"/>
-          </feMerge>
+        <filter id={fid} x="-70%" y="-70%" width="240%" height="240%">
+          <feGaussianBlur stdDeviation={type==='flare' ? 1.6 : 1.2} result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
         </filter>
       </defs>
 
       {type === 'dust' ? (
-        // 보케 먼지
         <g style={{ mixBlendMode: 'screen' }} filter={`url(#${fid})`}>
-          <circle cx="12" cy="12" r={size} fill={`url(#${gid})`} opacity="0.92" />
+          <circle cx="14" cy="14" r={size} fill={`url(#${gid})`} opacity="0.92" />
         </g>
       ) : (
-        // 강한 별 플레어(5각)
-        <g style={{ mixBlendMode: 'screen' }} filter={`url(#${fid})`} transform={`rotate(${rotate} 12 12)`}>
+        <g style={{ mixBlendMode: 'screen' }} filter={`url(#${fid})`} transform={`rotate(${rotate} 14 14)`}>
+          {/* 코어 */}
+          <circle cx="14" cy="14" r={Math.max(2.2, size*0.35)} fill={`url(#${gid})`} opacity="0.95"/>
+          {/* 별 본체 */}
           <polygon
-            points={starPoints(12, 12, 5, size, size * 0.45)}
+            points={starPoints(14, 14, 5, size, size * 0.45)}
             fill={`url(#${gid})`}
             stroke="#fbbf24"
-            strokeWidth="0.6"
-            opacity="0.95"
+            strokeWidth="0.7"
+            opacity="0.98"
           />
+          {/* 렌즈 플레어 스틱들 (큰 플레어일수록 길이 증가) */}
+          {(() => {
+            const len = (power ? 11 : 7) + size * 0.5;
+            const thin = power ? 1.6 : 1.2;
+            return (
+              <>
+                <rect x={14-len/2} y={14-thin/2} width={len} height={thin} fill="#fde047" opacity="0.85" rx={thin/2}/>
+                <rect x={14-thin/2} y={14-len/2} width={thin} height={len} fill="#fde047" opacity="0.85" rx={thin/2}/>
+                <rect x={14-len/2} y={14-thin/2} width={len} height={thin} fill="#fde047" opacity="0.7" rx={thin/2}
+                      transform="rotate(45 14 14)"/>
+                <rect x={14-len/2} y={14-thin/2} width={len} height={thin} fill="#fde047" opacity="0.7" rx={thin/2}
+                      transform="rotate(-45 14 14)"/>
+              </>
+            );
+          })()}
         </g>
       )}
     </svg>
   );
 }
+
 
 
 /** Toast bubble */
