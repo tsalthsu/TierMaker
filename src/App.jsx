@@ -946,7 +946,7 @@ function Toast({msg, type='info', isDark}){
   );
 }
 
-/** Button with optional spinner */
+/* Spinner 버튼 (AK 스타일) */
 function BlobButton({children,onClick,disabled,loading}){
   return (
     <button
@@ -968,7 +968,10 @@ function BlobButton({children,onClick,disabled,loading}){
   );
 }
 
-/** Theme toggle (pos: 'br'|'bl') */ (pos: 'br'|'bl') */
+
+/****************************************
+ * Theme toggle (pos: 'br'|'bl')
+ ****************************************/
 function ThemeToggle({isDark,onToggle,position="br"}){
   const posClass = position==="bl" ? "left-3 bottom-3" : "right-3 bottom-3";
   return (
@@ -977,14 +980,24 @@ function ThemeToggle({isDark,onToggle,position="br"}){
       title={isDark?'Light mode':'Dark mode'}
       className={`fixed ${posClass} z-[60] ak-btn ak-btn-icon`}
     >
-      {isDark? (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+      {isDark ? (
+        /* Sun */
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="5"/>
+          <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+        </svg>
       ) : (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+        /* Moon */
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+        </svg>
       )}
     </button>
   );
 }
+
 /** Hover-animated language picker (closeDelay adjustable) */
 function LangPicker({lang,setLang,langs,flags,names,isDark,open,setOpen,label,closeDelayMs=100}){
   const ref = useRef(null);
