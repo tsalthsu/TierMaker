@@ -797,8 +797,51 @@ export default function TierListApp() {
         .item-card:hover:after { opacity: 1; }
         .animate-pop { animation: pop .4s cubic-bezier(.2,1,.4,1); }
         @keyframes pop { 0% { transform: scale(.92); } 60% { transform: scale(1.06); } 100% { transform: scale(1); } }
-        @keyframes sparkle { 0% { transform: translate(0,0) scale(.4); opacity: 1; } 80% { opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)) scale(1); opacity: 0; } }
-        .sparkle { position: fixed; width: 10px; height: 10px; background: radial-gradient(circle at 30% 30%, #fff, #a5b4fc 60%, transparent 70%); border-radius: 50%; pointer-events: none; animation: sparkle .9s ease-out forwards; filter: drop-shadow(0 0 6px rgba(99,102,241,.7)); }
+        @keyframes sparkle {
+  0%   { transform: translate(0,0) scale(.6); opacity: 1; }
+  70%  { opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) scale(1.15); opacity: 0; }
+}
+        .sparkle {
+  position: fixed;
+  width: 10px; height: 10px;
+  /* 중심은 밝고, 가장자리는 투명해지는 금빛 그라디언트 */
+  background: radial-gradient(circle at 30% 30%,
+    #fff8e1 0%,
+    #fde68a 40%,
+    #f59e0b 65%,
+    rgba(245,158,11,0) 70%
+  );
+  border-radius: 50%;
+  pointer-events: none;
+  transform: translate(0,0) scale(.7);
+  animation: sparkle 480ms ease-out forwards;
+  /* 금빛 글로우 */
+  filter:
+    drop-shadow(0 0 10px rgba(251,191,36,.95))
+    drop-shadow(0 0 20px rgba(245,158,11,.45));
+}
+
+/* 반짝이는 십자형 광선 2겹 (회전 차이) */
+.sparkle::before,
+.sparkle::after {
+  content: '';
+  position: absolute;
+  inset: -4px;                 /* 살짝 크게 */
+  background:
+    conic-gradient(from 0deg,
+      rgba(253,224,71,0) 0deg 12deg,
+      rgba(253,224,71,.85) 12deg 18deg,
+      rgba(253,224,71,0) 18deg 42deg,
+      rgba(253,224,71,.85) 42deg 48deg,
+      rgba(253,224,71,0) 48deg 360deg
+    );
+  /* 가운데는 뚫고 가장자리만 보이게 */
+  -webkit-mask: radial-gradient(circle, transparent 55%, black 56%);
+  mask: radial-gradient(circle, transparent 55%, black 56%);
+  filter: blur(.4px);
+}
+.sparkle::after { transform: rotate(45deg); }
         @keyframes bubble { 0% { transform: translateY(0) scale(1); opacity: .8 } 50% { transform: translateY(-6px) scale(1.05); opacity: 1 } 100% { transform: translateY(0) scale(1); opacity: .8 } }
         .tier-inset-light { box-shadow: inset 0 10px 24px rgba(0,0,0,0.08), inset 0 -10px 24px rgba(0,0,0,0.06), inset 0 0 0 2px rgba(0,0,0,0.03); background: radial-gradient(120% 60% at 50% 40%, rgba(255,255,255,0.55), rgba(255,255,255,0) 70%); }
         .tier-inset-dark  { 
