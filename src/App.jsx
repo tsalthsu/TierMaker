@@ -186,7 +186,7 @@ export default function TierListApp() {
     { name: 'B', color: '#fbbf24', items: [] },
     { name: 'C', color: '#f97316', items: [] },
     { name: 'D', color: '#ef4444', items: [] },
-  );
+  ]);
 // keep refs size in sync with tiers length
   const tierContainerRefs = useRef({});
   useEffect(() => {
