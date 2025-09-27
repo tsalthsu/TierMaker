@@ -33,7 +33,7 @@ const ICON_OVERRIDES = {
 // PRTS 아이콘: 예외 있으면 우선, 없으면 Special:FilePath
 const prtsIcon = (cnName) => {
   if (ICON_OVERRIDES[cnName]) return ICON_OVERRIDES[cnName];
-  return `https://prts.wiki/w/Special:FilePath/${encodeURIComponent('头像_' + cnName)}.png`;
+  return `https://prts.wiki/w/Special:FilePath/${encodeURIComponent('头像_' + (cnName || enName))}.png`;
 };
 
 // 6성 판별
