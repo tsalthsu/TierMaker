@@ -656,7 +656,7 @@ function triggerSparkles(x, y) {
                 onClick={()=> loadFromOps(confirmTarget)}
                 className="px-4 py-2 rounded-xl text-white shadow-lg disabled:opacity-60"
                 disabled={loadingOps}
-                style={{background:'linear-gradient(180deg,#60a5fa,#38bdf8)'}}
+                style={{background:'linear-gradient(180deg,#e5e7eb,#cbd5e1)'}}
               >
                 {loadingOps ? t('loading') : t('confirmYes')}
               </button>
@@ -1149,8 +1149,8 @@ function BlobButton({children,onClick,disabled,loading}){
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`relative inline-flex items-center justify-center px-4 py-2 rounded-2xl font-semibold text-slate-900 shadow-lg active:scale-[0.98] transition select-none ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
-      style={{background:'linear-gradient(180deg,#93c5fd,#38bdf8)', filter:'url(#goo)'}}
+      className={`relative inline-flex items-center justify-center px-4 py-2 rounded-xl font-semibold text-slate-900 shadow-lg active:scale-[0.98] transition select-none ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
+      style={{ background:'linear-gradient(180deg,#e5e7eb,#cbd5e1)' }}
     >
       <span className="relative z-10 flex items-center gap-2">
         {loading && (
@@ -1160,7 +1160,6 @@ function BlobButton({children,onClick,disabled,loading}){
           </svg>
         )}
         {children}
-      </span>
       </span>
     </button>
   );
@@ -1173,8 +1172,9 @@ function ThemeToggle({isDark,onToggle,position="br"}){
     <button
       onClick={onToggle}
       title={isDark?'Light mode':'Dark mode'}
-      className={`fixed ${posClass} z-[60] w-10 h-10 grid place-items-center rounded-2xl border shadow-lg active:scale-95 transition ${isDark?'bg-slate-800/80 border-white/10 text-white':'bg-white border-slate-200 text-slate-900'}`}
-      style={{filter:'url(#goo)'}}
+      className={`fixed ${posClass} z-[60] w-10 h-10 grid place-items-center rounded-xl border shadow-lg active:scale-95 transition ${isDark?'bg-slate-800/80 border-white/10 text-white':'bg-white border-slate-200 text-slate-900'}`}
+// style 라인 제거(필요 시)
+
     >
       {isDark? (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"></path></svg>
