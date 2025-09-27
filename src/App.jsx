@@ -323,7 +323,25 @@ export default function TierListApp() {
       const container=tierContainerRefs.current[tierIndex];
       let insertIndex=computeInsertIndex(container,e.clientX,e.clientY,(data.from && data.from.tierIndex===tierIndex)? data.id : null);
       moveItem({ id:data.id, from:data.from, to:{ tierIndex, index:insertIndex } });
-      if(tierIndex===0){ setJustPoppedId(data.id); triggerSparkles(e.clientX,e.clientY); setTimeout(()=> setJustPoppedId(null),450);} 
+      if (tierIndex === 0) {
+  setJustPoppedId(data.id);
+  // 상태 반영 후 DOM에 카드가 렌더링된 다음 위치 계산
+  requestAnimationFrame(() => {
+    const card = tierContainerRefs.current[tierIndex]?.querySelector(
+      `[data-role="card"][data-id="${data.id}"]`
+    );
+    if (card) {
+      const r = card.getBoundingClientRect();
+      const cx = r.left + r.width / 2;
+      const cy = r.top + r.height / 2;
+      triggerSparkles(cx, cy);
+    } else {
+      // 혹시 못 찾았을 때는 임시로 마우스 좌표
+      triggerSparkles(e.clientX, e.clientY);
+    }
+  });
+  setTimeout(() => setJustPoppedId(null), 450);
+}
     } catch {}
     onDragEnd();
   }
@@ -958,7 +976,16 @@ function FitText({ text, maxFont=20, minFont=10, maxLines=2 }){
   return <span ref={ref} style={{display:'-webkit-box', WebkitLineClamp:maxLines, WebkitBoxOrient:'vertical', overflow:'hidden', width:'100%', height:'100%'}}>{text}</span>;
 }
 
-function Sparkle({x,y,angle,dist}){ const dx=Math.cos(angle)*dist; const dy=Math.sin(angle)*dist; return <div className="sparkle" style={{left:x, top:y, "--dx":`${dx}px`, "--dy":`${dy}px`}}/>; }
+function Sparkle({ x, y, angle, dist }) {
+  const dx = Math.cos(angle) * dist;
+  const dy = Math.sin(angle) * dist;
+  return (
+    <div
+      className="sparkle"
+      style={{ left: x, top: y, "--dx": `${dx}px`, "--dy": `${dy}px` }}
+    />
+  );
+}
 
 /** Toast bubble */
 function Toast({msg, type='info', isDark}){
