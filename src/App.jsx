@@ -625,11 +625,11 @@ function triggerSparkles(x, y) {
             <div className="flex justify-center gap-3 pt-2">
               <button
                 onClick={()=> setShowResetModal(false)}
-                className={`px-4 py-2 rounded-xl border ${isDark?'bg-white/10 border-white/10':'bg-white border-slate-200'}`}
+                className={`px-4 py-2 rounded border ${isDark?'bg-white/10 border-white/10':'bg-white border-slate-200'}`}
               >{t('cancel')}</button>
               <button
                 onClick={doReset}
-                className="px-4 py-2 rounded-xl text-white shadow-lg"
+                className="px-4 py-2 rounded text-white shadow-lg"
                 style={{background:'linear-gradient(180deg,#fb7185,#ef4444)'}}
               >{t('resetGo')}</button>
             </div>
@@ -650,11 +650,11 @@ function triggerSparkles(x, y) {
             <div className="flex justify-center gap-3 pt-2">
               <button
                 onClick={()=> setConfirmTarget(null)}
-                className={`px-4 py-2 rounded-xl border ${isDark?'bg-white/10 border-white/10':'bg-white border-slate-200'}`}
+                className={`px-4 py-2 rounded border ${isDark?'bg-white/10 border-white/10':'bg-white border-slate-200'}`}
               >{t('cancel')}</button>
               <button
                 onClick={()=> loadFromOps(confirmTarget)}
-                className="px-4 py-2 rounded-xl text-white shadow-lg disabled:opacity-60"
+                className="px-4 py-2 rounded text-white shadow-lg disabled:opacity-60"
                 disabled={loadingOps}
                 style={{background:'linear-gradient(180deg,#e5e7eb,#cbd5e1)'}}
               >
@@ -696,7 +696,7 @@ function triggerSparkles(x, y) {
             <button
               type="button"
               onClick={()=> setShowNames(v=>!v)}
-              className={`px-3 py-2 rounded-xl border text-sm ${isDark?'bg-white/10 border-white/10 text-white':'bg-white border-slate-200 text-slate-900'}`}
+              className={`px-3 py-2 rounded border text-sm ${isDark?'bg-white/10 border-white/10 text-white':'bg-white border-slate-200 text-slate-900'}`}
               title={t('nameShow')}
             >
               {showNames ? t('nameHide') : t('nameShow')}
@@ -728,12 +728,12 @@ function triggerSparkles(x, y) {
             onDrop={e=>{ e.preventDefault(); const files=[...e.dataTransfer.files].filter(f=>f.type.startsWith('image/')); if(files.length) addFilesAsItems(files); }}
           >
             <div className="flex flex-wrap gap-3 items-center">
-              <label className={`cursor-pointer inline-flex items-center gap-2 px-3 py-2 rounded-xl border transition ${isDark?'bg-white/10 border-white/10 hover:bg-white/15':'bg-slate-50 border-slate-200 hover:bg-slate-100'}`}>파일 선택(복수)
+              <label className={`cursor-pointer inline-flex items-center gap-2 px-3 py-2 rounded border transition ${isDark?'bg-white/10 border-white/10 hover:bg-white/15':'bg-slate-50 border-slate-200 hover:bg-slate-100'}`}>파일 선택(복수)
                 <input type="file" accept="image/*" multiple className="hidden" onChange={onSelectFiles}/>
               </label>
               <div className="grow"/>
-              <input className={`px-3 py-2 rounded-xl border w-44 focus:outline-none focus:ring-2 ${isDark ? 'bg-white/10 border-white/10 focus:ring-blue-400/70 text-white placeholder-white/70' : 'bg-white border-slate-200 focus:ring-sky-300 text-slate-900 placeholder-slate-400'}`} placeholder={t('inputLabel')} value={newLabel} onChange={e=> setNewLabel(e.target.value)} />
-              <input className={`px-3 py-2 rounded-xl border w-56 focus:outline-none focus:ring-2 ${isDark ? 'bg-white/10 border-white/10 focus:ring-blue-400/70 text-white placeholder-white/70' : 'bg-white border-slate-200 focus:ring-sky-300 text-slate-900 placeholder-slate-400'}`} placeholder={t('inputImg')} value={newImgUrl} onChange={e=> setNewImgUrl(e.target.value)} />
+              <input className={`px-3 py-2 rounded border w-44 focus:outline-none focus:ring-2 ${isDark ? 'bg-white/10 border-white/10 focus:ring-blue-400/70 text-white placeholder-white/70' : 'bg-white border-slate-200 focus:ring-sky-300 text-slate-900 placeholder-slate-400'}`} placeholder={t('inputLabel')} value={newLabel} onChange={e=> setNewLabel(e.target.value)} />
+              <input className={`px-3 py-2 rounded border w-56 focus:outline-none focus:ring-2 ${isDark ? 'bg-white/10 border-white/10 focus:ring-blue-400/70 text-white placeholder-white/70' : 'bg-white border-slate-200 focus:ring-sky-300 text-slate-900 placeholder-slate-400'}`} placeholder={t('inputImg')} value={newImgUrl} onChange={e=> setNewImgUrl(e.target.value)} />
               <BlobButton onClick={()=> addNewItem(newLabel, newImgUrl)}>{t('addSingle')}</BlobButton>
             </div>
           </div>
@@ -777,7 +777,7 @@ function triggerSparkles(x, y) {
                       <button onClick={()=> startEditTier(idx)} title="Edit tier name" className="w-full h-full">{tier.name}</button>
                     )}
                     {openTierMenu===idx && (
-                      <div className={`absolute top-16 right-1 z-[70] rounded-xl border p-2 w-48 overflow-hidden ${isDark? 'bg-slate-900 border-white/10 text-white':'bg-white border-slate-200 text-slate-900'} shadow-xl`} onClick={e=> e.stopPropagation()}>
+                      <div className={`absolute top-16 right-1 z-[70] rounded border p-2 w-48 overflow-hidden ${isDark? 'bg-slate-900 border-white/10 text-white':'bg-white border-slate-200 text-slate-900'} shadow-xl`} onClick={e=> e.stopPropagation()}>
                         <label className="flex items-center justify-between text-sm mb-2">Color
                           <input type="color" value={tier.color} onChange={e=> setTierColor(idx, e.target.value)} className="w-6 h-6 border-0 p-0 bg-transparent cursor-pointer" />
                         </label>
@@ -827,7 +827,7 @@ function triggerSparkles(x, y) {
                   className="flex-1 min-h-[112px] rounded-2xl p-3 flex flex-wrap gap-3 relative overflow-visible"
                 >
                   {dragData && hoverTierIndex===idx && isPointInsideTier(idx) && (<div className={`pointer-events-none absolute inset-0 rounded-2xl ${isDark ? 'tier-inset-dark' : 'tier-inset-light'}`} />)}
-                  {tier.items.length===0 && !(dragData && hoverTierIndex===idx && isPointInsideTier(idx)) && (<div className={`rounded-xl px-3 py-6 border-2 border-dashed ${isDark?'border-white/10 text-white/40':'border-slate-200 text-slate-400'} text-sm`}>{t('dragHere')}</div>)}
+                  {tier.items.length===0 && !(dragData && hoverTierIndex===idx && isPointInsideTier(idx)) && (<div className={`rounded px-3 py-6 border-2 border-dashed ${isDark?'border-white/10 text-white/40':'border-slate-200 text-slate-400'} text-sm`}>{t('dragHere')}</div>)}
                   {(() => { 
                     const original = tier.items;
                     const filtered = (dragData && dragData.from && dragData.from.tierIndex===idx && hoverTierIndex===idx)
@@ -986,7 +986,7 @@ function DraggableItem({ item, onDragStart, justPopped, index, isDark, onRename,
       className={`item-card ${square?'square':''} group select-none border shadow-lg hover:-translate-y-0.5 transition transform ${justPopped?'animate-pop':''} ${isDark?'bg-slate-800/80 border-white/10':'bg-white/90 border-slate-200'} ${isDragging?'opacity-50':''}`}
     >
       {open && (
-        <div className={`absolute top-9 right-1 z-[80] rounded-xl border p-2 w-48 overflow-hidden ${isDark?'bg-slate-900 border-white/10 text-white':'bg-white border-slate-200 text-slate-900'} shadow-2xl`} onClick={e=> e.stopPropagation()}>
+        <div className={`absolute top-9 right-1 z-[80] rounded border p-2 w-48 overflow-hidden ${isDark?'bg-slate-900 border-white/10 text-white':'bg-white border-slate-200 text-slate-900'} shadow-2xl`} onClick={e=> e.stopPropagation()}>
           <div className="flex items-center gap-2 mb-2">
             <input className={`w-32 text-sm px-2 py-1 rounded-lg border ${isDark?'bg-slate-800 border-white/10':'bg-white border-slate-200'}`} defaultValue={name} onKeyDown={e=>{ if(e.key==='Enter'){ const v=e.currentTarget.value.trim()||name; onRename&&onRename(v); setOpen(false);} }} />
             <button onClick={e=>{ const inp=e.currentTarget.parentElement?.querySelector('input'); const v=(inp?.value||'').trim()||name; onRename&&onRename(v); setOpen(false); }} className="text-sm px-2 py-1 rounded-lg bg-emerald-500/90 text-white whitespace-nowrap">OK</button>
@@ -1135,7 +1135,7 @@ function Toast({msg, type='info', isDark}){
              :                    (isDark?'bg-white/10 text-white border-white/15':'bg-white text-slate-900 border-slate-200');
   return (
     <div className={`toast [animation-fill-mode:forwards]`} data-life="short">
-      <div className={`min-w-[220px] max-w-[60vw] px-3 py-2 rounded-xl border shadow-lg ${tone}`}>
+      <div className={`min-w-[220px] max-w-[60vw] px-3 py-2 rounded border shadow-lg ${tone}`}>
         <div className="text-sm">{msg}</div>
       </div>
     </div>
@@ -1149,7 +1149,7 @@ function BlobButton({children,onClick,disabled,loading}){
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`relative inline-flex items-center justify-center px-4 py-2 rounded-xl font-semibold text-slate-900 shadow-lg active:scale-[0.98] transition select-none ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
+      className={`relative inline-flex items-center justify-center px-4 py-2 rounded font-semibold text-slate-900 shadow-lg active:scale-[0.98] transition select-none ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
       style={{ background:'linear-gradient(180deg,#e5e7eb,#cbd5e1)' }}
     >
       <span className="relative z-10 flex items-center gap-2">
@@ -1172,7 +1172,7 @@ function ThemeToggle({isDark,onToggle,position="br"}){
     <button
       onClick={onToggle}
       title={isDark?'Light mode':'Dark mode'}
-      className={`fixed ${posClass} z-[60] w-10 h-10 grid place-items-center rounded-xl border shadow-lg active:scale-95 transition ${isDark?'bg-slate-800/80 border-white/10 text-white':'bg-white border-slate-200 text-slate-900'}`}
+      className={`fixed ${posClass} z-[60] w-10 h-10 grid place-items-center rounded border shadow-lg active:scale-95 transition ${isDark?'bg-slate-800/80 border-white/10 text-white':'bg-white border-slate-200 text-slate-900'}`}
 // style 라인 제거(필요 시)
 
     >
@@ -1215,7 +1215,7 @@ function LangPicker({lang,setLang,langs,flags,names,isDark,open,setOpen,label,cl
       {/* anchor / compact button */}
       <button
         type="button"
-        className={`px-3 py-2 rounded-xl border text-sm flex items-center gap-2 ${isDark?'bg-white/10 border-white/10 text-white':'bg-white border-slate-200 text-slate-900'}`}
+        className={`px-3 py-2 rounded border text-sm flex items-center gap-2 ${isDark?'bg-white/10 border-white/10 text-white':'bg-white border-slate-200 text-slate-900'}`}
         title={label}
       >
         <span style={{fontSize:14}}>{flags[lang] || '🌐'}</span>
@@ -1230,7 +1230,7 @@ function LangPicker({lang,setLang,langs,flags,names,isDark,open,setOpen,label,cl
               key={code}
               type="button"
               onClick={()=> setLang(code)}
-              className={`px-3 py-2 rounded-xl flex items-center gap-2 text-sm transition ${code===lang ? (isDark?'bg-white/10':'bg-slate-100') : (isDark?'hover:bg-white/10':'hover:bg-slate-100')}`}
+              className={`px-3 py-2 rounded flex items-center gap-2 text-sm transition ${code===lang ? (isDark?'bg-white/10':'bg-slate-100') : (isDark?'hover:bg-white/10':'hover:bg-slate-100')}`}
             >
               <span style={{fontSize:14}}>{flags[code] || '🌐'}</span>
               <span>{names[code] || code.toUpperCase()}</span>
