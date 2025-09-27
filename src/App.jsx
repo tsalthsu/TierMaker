@@ -876,23 +876,17 @@ function triggerSparkles(x, y) {
   10%  { opacity: 1; }
   60%  { transform: translate(var(--dx), var(--dy)) scale(1.02); opacity: 1; }
   100% { transform: translate(var(--dx), var(--dy)) scale(1.12); opacity: 0; }
-}    
+}
+
         @keyframes twinkle {
   0%,100% { opacity: .85; }
   50%     { opacity: 1;   }
 }
-.sparkle {
-  position: fixed;
-  width: 24px; height: 24px;
-  pointer-events: none;
-  background: transparent !important;
-  animation: sparkle-move 1000ms ease-out forwards;
-}
-.sparkle::before,
-.sparkle::after { content: none !important; } /* 옛 네모/태양 제거 */
+.sparkle { position: fixed; width: 28px; height: 28px; pointer-events:none; background:transparent!important; animation:sparkle-move 1000ms ease-out forwards; }
+.sparkle::before,.sparkle::after { content:none!important; } /* 네모/태양 제거 */
+.sparkle-dust  { animation-duration: 900ms; }
+.sparkle-flare { animation-duration: 1200ms; }  /* 플레어는 더 길게 */
 
-.sparkle-dust { animation-duration: 900ms; }
-.sparkle-flare{ animation-duration: 1100ms; }
 
 /* SVG 내부의 원형먼지는 미세하게 반짝임(개별 delay는 inline) */
 .sparkle-dust circle { animation: twinkle 480ms ease-in-out infinite; }
