@@ -1,12 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react"; 
 import ExportPNG from "./components/ExportPNG";
+import SparkleSystem from "./components/SparkleSystem"; // [추가] 파티클 시스템 임포트
 import riLogo from "./assets/ri-logo.webp";
 /* @vite-ignore */
 // Tier List (Save 10: Multi-load 4/5/6/All + confirm modals)
-// - Header: 4★/5★/6★/All buttons (in that order)
-// - Each shows a confirm modal before loading
-// - Fetch tries /api/ops?star=X then falls back to /api/opsX
-// - i18n, theme bottom-left, name on/off, toast, row-based DnD maintained
 
 export default function TierListApp() {
   // ---------- Theme ----------
@@ -204,18 +201,23 @@ export default function TierListApp() {
   // DnD state
   const [dragData, setDragData] = useState(null);
   const [justPoppedId, setJustPoppedId] = useState(null);
-  const [sparkles, setSparkles] = useState([]);
+  
+  // [수정] sparkles state 제거하고 ref 사용
+  const sparkleSystemRef = useRef(null);
   const [sweeps, setSweeps] = useState([]);
+  
   const addSweep = React.useCallback((left, top, w, h, radius = 12) => {
     setSweeps(prev => [...prev, { id: uid(), x: left, y: top, w, h, r: radius, createdAt: Date.now() }]);
   }, []);
+  
   useEffect(() => {
-  const t = setInterval(() => {
-    setSparkles(prev => prev.filter(s => Date.now() - s.createdAt < (s.life || 1100)));
-    setSweeps(prev => prev.filter(sw => Date.now() - sw.createdAt < 900));
-  }, 200);
-  return () => clearInterval(t);
-}, []);
+    // [수정] sparkles 정리 로직 제거, sweeps만 유지
+    const t = setInterval(() => {
+      setSweeps(prev => prev.filter(sw => Date.now() - sw.createdAt < 900));
+    }, 200);
+    return () => clearInterval(t);
+  }, []);
+
   const overlayRef = useRef(null);
   const cachedRectsRef = useRef({});
   const rafRef = useRef(null);
@@ -339,25 +341,26 @@ export default function TierListApp() {
       let insertIndex=computeInsertIndex(container,e.clientX,e.clientY,(data.from && data.from.tierIndex===tierIndex)? data.id : null);
       moveItem({ id:data.id, from:data.from, to:{ tierIndex, index:insertIndex } });
       if (tierIndex === 0) {
-  setJustPoppedId(data.id);
-  // 상태 반영 후 DOM에 카드가 렌더링된 다음 위치 계산
-  requestAnimationFrame(() => {
-    const card = tierContainerRefs.current[tierIndex]?.querySelector(
-      `[data-role="card"][data-id="${data.id}"]`
-    );
-    if (card) {
-      const r = card.getBoundingClientRect();
-      const cx = r.left + r.width / 2;
-      const cy = r.top + r.height / 2;
-      addSweep(r.left, r.top, r.width, r.height, 12);
-      triggerSparkles(cx, cy);
-    } else {
-      // 혹시 못 찾았을 때는 임시로 마우스 좌표
-      triggerSparkles(e.clientX, e.clientY);
-    }
-  });
-  setTimeout(() => setJustPoppedId(null), 450);
-}
+        setJustPoppedId(data.id);
+        // 상태 반영 후 DOM에 카드가 렌더링된 다음 위치 계산
+        requestAnimationFrame(() => {
+          const card = tierContainerRefs.current[tierIndex]?.querySelector(
+            `[data-role="card"][data-id="${data.id}"]`
+          );
+          if (card) {
+            const r = card.getBoundingClientRect();
+            const cx = r.left + r.width / 2;
+            const cy = r.top + r.height / 2;
+            addSweep(r.left, r.top, r.width, r.height, 12);
+            // [수정] 기존 triggerSparkles 대신 시스템 호출
+            sparkleSystemRef.current?.trigger(cx, cy);
+          } else {
+            // [수정] 기존 triggerSparkles 대신 시스템 호출
+            sparkleSystemRef.current?.trigger(e.clientX, e.clientY);
+          }
+        });
+        setTimeout(() => setJustPoppedId(null), 450);
+      }
     } catch {}
     onDragEnd();
   }
@@ -448,46 +451,7 @@ export default function TierListApp() {
     return p.x >= r.left - margin && p.x <= r.right + margin && p.y >= r.top - margin && p.y <= r.bottom + margin;
   };
 
-function triggerSparkles(x, y) {
-  const id = uid();
-
-  // --- BACK layer (behind cards): dense ring + dust + big flare ---
-  const ringN = 36;
-  const dustN = 60;
-
-  const backRing = Array.from({ length: ringN }).map((_, i) => {
-    const a = (Math.PI * 2 * i) / ringN + (Math.random() * 0.3 - 0.15);
-    const dist = 70 + Math.random() * 30; // larger radius
-    return { id: `${id}-br-${i}`, layer: 'back', type: 'dust', x, y, angle: a, dist,
-      size: 2 + Math.random()*2, life: 1000 + Math.random()*250, createdAt: Date.now(), delay: Math.floor(Math.random()*120) };
-  });
-
-  const backDust = Array.from({ length: dustN }).map((_, i) => {
-    const a = Math.random() * Math.PI * 2;
-    const dist = 40 + Math.random() * 60;
-    return { id: `${id}-bd-${i}`, layer: 'back', type: 'dust', x, y, angle: a, dist,
-      size: 1.6 + Math.random()*2.4, life: 900 + Math.random()*280, createdAt: Date.now(), delay: Math.floor(Math.random()*160) };
-  });
-
-  const backFlare = {
-    id: `${id}-bf-0`, layer: 'back', type: 'flare', x, y,
-    angle: Math.random()*Math.PI*2, dist: 60 + Math.random()*20,
-    size: 18 + Math.random()*6, rotate: (Math.random()*20-10), power: 1,
-    life: 1400 + Math.random()*260, createdAt: Date.now(), delay: 30 + Math.floor(Math.random()*90)
-  };
-
-  // --- FRONT layer (accent): optional small flare ---
-  const frontFlare = Math.random()<0.6 ? [{
-    id: `${id}-ff-0`, layer: 'front', type: 'flare', x, y,
-    angle: Math.random()*Math.PI*2, dist: 45 + Math.random()*14,
-    size: 10 + Math.random()*4, rotate: (Math.random()*16-8),
-    life: 1100 + Math.random()*220, createdAt: Date.now(), delay: 80 + Math.floor(Math.random()*120)
-  }] : [];
-
-  setSparkles(prev => [...prev, ...backRing, ...backDust, backFlare, ...frontFlare]);
-}
-
-
+  // [수정] triggerSparkles 함수 삭제됨
 
   const [editingTierIndex,setEditingTierIndex]=useState(null);
   const [editingTierValue,setEditingTierValue]=useState('');
@@ -606,20 +570,19 @@ function triggerSparkles(x, y) {
   return (
     <div className={`${isDark?'text-white':'text-slate-900'} min-h-screen transition-colors duration-300 ${isDark?'bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800':'bg-gradient-to-br from-slate-100 via-white to-slate-100'}`}>
       <GooDefs/>
-{/* Back layer (behind cards) */}
-<div className="pointer-events-none fixed inset-0 z-0">
-  {sparkles.filter(s => s.layer === 'back').map(s => (
-    <Sparkle key={s.id} {...s} />
-  ))}
-</div>
+      {/* [추가] 파티클 시스템 (Back/Front 레이어 통합 관리) */}
+      <SparkleSystem ref={sparkleSystemRef} />
 
-{/* Front layer (sweep/flare accent) */}
-<div className="pointer-events-none fixed inset-0 z-40">
-  {sweeps.map(sw => <SweepGlow key={sw.id} {...sw} />)}
-  {sparkles.filter(s => s.layer === 'front').map(s => (
-    <Sparkle key={s.id} {...s} />
-  ))}
-</div>
+      {/* [수정] Back layer (behind cards) - DOM 렌더링 제거 */}
+      <div className="pointer-events-none fixed inset-0 z-0">
+        {/* Sparkle 컴포넌트 렌더링 삭제됨 */}
+      </div>
+
+      {/* [수정] Front layer (sweep/flare accent) - Sparkle 제거, SweepGlow 유지 */}
+      <div className="pointer-events-none fixed inset-0 z-40">
+        {sweeps.map(sw => <SweepGlow key={sw.id} {...sw} />)}
+        {/* Sparkle 컴포넌트 렌더링 삭제됨 */}
+      </div>
 
       {/* Theme toggle moved to bottom-left */}
       <ThemeToggle isDark={isDark} onToggle={()=> setTheme(isDark?'light':'dark')} position="bl" />
@@ -920,30 +883,8 @@ function triggerSparkles(x, y) {
         .item-card:hover:after { opacity: 1; }
         .animate-pop { animation: pop .4s cubic-bezier(.2,1,.4,1); }
         @keyframes pop { 0% { transform: scale(.92); } 60% { transform: scale(1.06); } 100% { transform: scale(1); } }
-        @keyframes sparkle {
-  0%   { transform: translate(0,0) scale(.6);  opacity: 1; }
-  50%  { transform: translate(var(--dx), var(--dy)) scale(1.0); opacity: 1; }
-  100% { transform: translate(var(--dx), var(--dy)) scale(1.15); opacity: 0; }
-}
-        @keyframes sparkle-move {
-  0%   { transform: translate(0,0) scale(.70); opacity: 0.0; }
-  10%  { opacity: 1; }
-  60%  { transform: translate(var(--dx), var(--dy)) scale(1.02); opacity: 1; }
-  100% { transform: translate(var(--dx), var(--dy)) scale(1.12); opacity: 0; }
-}
-
-        @keyframes twinkle {
-  0%,100% { opacity: .85; }
-  50%     { opacity: 1;   }
-}
-.sparkle { position: fixed; width: 28px; height: 28px; pointer-events:none; background:transparent!important; animation:sparkle-move 1000ms ease-out forwards; }
-.sparkle::before,.sparkle::after { content:none!important; } /* 네모/태양 제거 */
-.sparkle-dust  { animation-duration: 900ms; }
-.sparkle-flare { animation-duration: 1200ms; }  /* 플레어는 더 길게 */
-
-
-/* SVG 내부의 원형먼지는 미세하게 반짝임(개별 delay는 inline) */
-.sparkle-dust circle { animation: twinkle 480ms ease-in-out infinite; }
+        
+        /* [수정] 무거운 파티클 CSS 애니메이션 제거 */
 
         @keyframes bubble { }
         .ghost-card{opacity:.65; outline-offset:-2px;}
@@ -1011,10 +952,7 @@ function SweepGlow({ x, y, w, h, r }) {
   );
 }
 
-function addSweep(left, top, w, h, radius=12){
-  setSweeps(prev => [...prev, { id: uid(), x:left, y:top, w, h, r: radius, createdAt: Date.now() }]);
-}
-
+// [수정] Sparkle 컴포넌트 삭제됨
 
 function DraggableItem({ item, onDragStart, justPopped, index, isDark, onRename, onDelete, isDragging, showNames, name }){
   const ref = useRef(null);
@@ -1111,70 +1049,6 @@ function FitText({ text, maxFont=20, minFont=10, maxLines=2 }){
   return <span ref={ref} style={{display:'-webkit-box', WebkitLineClamp:maxLines, WebkitBoxOrient:'vertical', overflow:'hidden', width:'100%', height:'100%'}}>{text}</span>;
 }
 
-function Sparkle({ x, y, angle, dist, type='dust', size=2, delay=0, rotate=0, power=0 }) {
-  const dx = Math.cos(angle) * dist;
-  const dy = Math.sin(angle) * dist;
-
-  const gid = React.useMemo(() => 'g_' + uid(), []);
-  const fid = React.useMemo(() => 'f_' + uid(), []);
-
-  return (
-    <svg
-      className={`sparkle ${type==='flare' ? 'sparkle-flare' : 'sparkle-dust'}`}
-      style={{ left: x, top: y, "--dx": `${dx}px`, "--dy": `${dy}px`, animationDelay: `${delay}ms` }}
-      width="28" height="28" viewBox="0 0 28 28" aria-hidden
-    >
-      <defs>
-        <radialGradient id={gid} cx="50%" cy="50%" r="60%">
-          <stop offset="0%"  stopColor="#fff8e1" stopOpacity="1"/>
-          <stop offset="45%" stopColor="#fde047" stopOpacity="0.95"/>
-          <stop offset="100%" stopColor="#f59e0b" stopOpacity="0"/>
-        </radialGradient>
-        <filter id={fid} x="-70%" y="-70%" width="240%" height="240%">
-          <feGaussianBlur stdDeviation={type==='flare' ? 1.6 : 1.2} result="b"/>
-          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-        </filter>
-      </defs>
-
-      {type === 'dust' ? (
-        <g style={{ mixBlendMode: 'screen' }} filter={`url(#${fid})`}>
-          <circle cx="14" cy="14" r={size} fill={`url(#${gid})`} opacity="0.92" />
-        </g>
-      ) : (
-        <g style={{ mixBlendMode: 'screen' }} filter={`url(#${fid})`} transform={`rotate(${rotate} 14 14)`}>
-          {/* 코어 */}
-          <circle cx="14" cy="14" r={Math.max(2.2, size*0.35)} fill={`url(#${gid})`} opacity="0.95"/>
-          {/* 별 본체 */}
-          <polygon
-            points={starPoints(14, 14, 5, size, size * 0.45)}
-            fill={`url(#${gid})`}
-            stroke="#fbbf24"
-            strokeWidth="0.7"
-            opacity="0.98"
-          />
-          {/* 렌즈 플레어 스틱들 (큰 플레어일수록 길이 증가) */}
-          {(() => {
-            const len = (power ? 11 : 7) + size * 0.5;
-            const thin = power ? 1.6 : 1.2;
-            return (
-              <>
-                <rect x={14-len/2} y={14-thin/2} width={len} height={thin} fill="#fde047" opacity="0.85" rx={thin/2}/>
-                <rect x={14-thin/2} y={14-len/2} width={thin} height={len} fill="#fde047" opacity="0.85" rx={thin/2}/>
-                <rect x={14-len/2} y={14-thin/2} width={len} height={thin} fill="#fde047" opacity="0.7" rx={thin/2}
-                      transform="rotate(45 14 14)"/>
-                <rect x={14-len/2} y={14-thin/2} width={len} height={thin} fill="#fde047" opacity="0.7" rx={thin/2}
-                      transform="rotate(-45 14 14)"/>
-              </>
-            );
-          })()}
-        </g>
-      )}
-    </svg>
-  );
-}
-
-
-
 /** Toast bubble */
 function Toast({msg, type='info', isDark}){
   const tone = type==='success' ? (isDark?'bg-emerald-500/15 text-emerald-200 border-emerald-400/30':'bg-emerald-50 text-emerald-800 border-emerald-300')
@@ -1221,8 +1095,6 @@ function ThemeToggle({isDark,onToggle,position="br"}){
       onClick={onToggle}
       title={isDark?'Light mode':'Dark mode'}
       className={`fixed ${posClass} z-[60] w-10 h-10 grid place-items-center rounded border shadow-lg active:scale-95 transition ${isDark?'bg-slate-800/80 border-white/10 text-white':'bg-white border-slate-200 text-slate-900'}`}
-// style 라인 제거(필요 시)
-
     >
       {isDark? (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"></path></svg>
@@ -1311,23 +1183,5 @@ function uid(){ return Math.random().toString(36).slice(2,9)+Date.now().toString
 function clamp(n,a,b){ return Math.max(a, Math.min(b,n)); }
 function insertAt(arr,index,value){ const c=arr.slice(); c.splice(index,0,value); return c; }
 function randomNiceColor(){ const palette=["#60a5fa","#38bdf8","#22d3ee","#34d399","#a78bfa","#f472b6","#fbbf24","#f97316","#ef4444"]; return palette[Math.floor(Math.random()*palette.length)]; }
-// 5각 별 좌표 생성 (24x24 기준)
-function starPoints(cx, cy, spikes = 5, outer = 9, inner = 4) {
-  let rot = Math.PI / 2 * 3;
-  const step = Math.PI / spikes;
-  const pts = [];
-  for (let i = 0; i < spikes; i++) {
-    let x = cx + Math.cos(rot) * outer;
-    let y = cy + Math.sin(rot) * outer;
-    pts.push(`${x},${y}`);
-    rot += step;
-    x = cx + Math.cos(rot) * inner;
-    y = cy + Math.sin(rot) * inner;
-    pts.push(`${x},${y}`);
-    rot += step;
-  }
-  return pts.join(' ');
-}
 
 export { TierListApp as App };
- 
